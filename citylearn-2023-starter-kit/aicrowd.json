@@ -1,0 +1,9 @@
+{
+  "challenge_id": "control-track-citylearn-challenge",
+  "authors": [
+    "aicrowd-bot"
+  ],
+  "central_agent": "True",
+  "description": "(optional) description about your awesome agent"
+}
+
