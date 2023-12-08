@@ -137,7 +137,7 @@ $$
 where:
 $$
 \begin{equation}
-    l = \left (\sum_{d=0}^{n\div h} 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
+    l = \sum_{d=0}^{n\div h} \left (1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
 \end{equation}
 $$
 where:
@@ -286,7 +286,7 @@ We convert it to:
 $$
 \begin{equation}
     \begin{split}
-        Reward = 0.3 \cdot Comfort_t + 0.1 \cdot Emissions_t + 0.3 \cdot Grid_t + 0.3 \cdot Resilience_t,
+        Reward_t = 0.3 \cdot Comfort_t + 0.1 \cdot Emissions_t + 0.3 \cdot Grid_t + 0.3 \cdot Resilience_t,
     \end{split}
 \end{equation}
 $$
@@ -413,13 +413,13 @@ $$
 where **DUBBLE CHECK**:
 $$
 \begin{equation}
-    l = \left (\sum_{d=0}^{n\div h} 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
+    l = \sum_{d=0}^{n\div h} \left ( 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
 \end{equation}
 $$
 TO ->
 $$
 \begin{equation}
-    l_t = 1 - \frac{(\sum^{t}_{i = t - h} E_{i})\div h}{max(E_{t-h}, E_{t-h+1} ..., E_{t})})
+    l_t = 1 - \frac{(\sum^{t}_{i = t - h} E_{i})\div h}{max(E_{t-h}, E_{t-h+1} ..., E_{t})}
 \end{equation}
 $$
 where:
@@ -427,6 +427,7 @@ $E$ = Neighborhood-level net electricity consumption
 $n$ = Total number of time steps
 $d$ = Day
 $h$ = Hours per day
+$t$ = Current time step
 
 ---
 
@@ -437,7 +438,7 @@ $$
     Pd = pd_{t} \div pd_{t}^{baseline},
 \end{equation}
 $$
-where **DUBBLE CHECK:**:
+where **DOUBLE CHECK:**:
 $$
 \begin{equation}
     p_{d} = \left ( \sum^{n \div h}_{d = 0} max (E_{d \cdot h},..., E_{d \cdot h + h - 1}) \right ) \div \left ( \frac{n}{h} \right ),
@@ -455,36 +456,32 @@ $E$ = Neighborhood-level net electricity consumption,
 $n$ = Total number of time steps,
 $d$ = Day,
 $h$ = Hours per day.
+$t$ = Current timestep
 
 ---
 
 **P_n : All-time peak -> Maximum consumption at any time step.**
-**-> Maximum consumption at any time step of last 24 hours.**
-**-> Current consumption**
 
 How will this be incoorporated step-wise?
 
 $$
 \begin{equation}
-    Pn = p_{n_{t}} \div p_{n_{t}}^{baseline},
-\end{equation}
-$$
-<!-- $$
-\begin{equation}
-    P_n = p_{n_{control}} \div p_{n_{baseline}},
-\end{equation}
-$$ -->
-where:
-$$
-\begin{equation}
-    p_{n_{t}} = max(E_{t-h}, ... , E_t),
+    Pn = p_{n} \div p_{n}^{baseline},
 \end{equation}
 $$
 
-OR:
+To?:
+
+**-> Current consumption**
 $$
 \begin{equation}
-    Pn = E_t,
+    P_t = p_{t} \div p_{t}^{baseline},
+\end{equation}
+$$
+
+$$
+\begin{equation}
+    P_t = E_t,
 \end{equation}
 $$
 
