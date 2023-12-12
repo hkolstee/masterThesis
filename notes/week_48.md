@@ -1,4 +1,4 @@
-# Notes Week 47
+# Notes Week 48
 ---
 ### Dependence Diagram:
 A dependency graph is a data structure formed by a directed graph that describes the dependency of an entity in the system on the other entities of the same system. The underlying structure of a dependency graph is a directed graph where each node points to the node on which it depends.
@@ -137,7 +137,7 @@ $$
 where:
 $$
 \begin{equation}
-    l = \sum_{d=0}^{n\div h} \left (1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
+    l = \left ( \sum_{d=0}^{n\div h} 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
 \end{equation}
 $$
 where:
@@ -149,6 +149,8 @@ $h$ = Hours per day
 ---
 
 **P_d: Daily peak -> Average, maximum consumption at any time step per day.**
+
+NOTE: ESCALATED REWARD
 
 $$
 \begin{equation}
@@ -315,6 +317,8 @@ $$
 \end{equation}
 $$
 
+NOTE FROM MEETINGl TRANSITION INDEPENDENT DECENTRALIZED MDP
+
 where these 4 reward components are made up of 8 key performance indicators (KPIs): carbon emissions (G), discomfort (U), ramping (R), 1 - load factor (L), daily peak (Pd), all-time peak (Pn) 1 - thermal resilience (M), and normalized unserved energy (S). 
 
 The grid and resilience reward components are averages over their KPIs. 
@@ -413,7 +417,7 @@ $$
 where **DUBBLE CHECK**:
 $$
 \begin{equation}
-    l = \sum_{d=0}^{n\div h} \left ( 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
+    l = \left (\sum_{d=0}^{n\div h} 1 - \frac{(\sum^{d \cdot h + h - 1}_{t = d \cdot h} E_{t})\div h}{max(E_{d \cdot h}, ..., E_{d \cdot h + h - 1})} \right ) \div \left ( \frac{n}{h} \right ),
 \end{equation}
 $$
 TO ->

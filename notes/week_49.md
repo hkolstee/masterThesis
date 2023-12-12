@@ -1,5 +1,7 @@
 # Notes Week 47
+
 ---
+
 ### Dependence Diagram:
 A dependency graph is a data structure formed by a directed graph that describes the dependency of an entity in the system on the other entities of the same system. The underlying structure of a dependency graph is a directed graph where each node points to the node on which it depends.
 
@@ -8,6 +10,8 @@ In our project we will be looking at the score/reward function variable interdep
 ![Dependency graph](images/dependency_diagram.svg)
 
 The Grid key performance indicator (KPI) is calculated using neighborhood level observations. All other KPIs are building-wise additive calculations. The Comfort and Resilience KPIs have a lot of variables in common as the unmet hours(U) and  are the same except for the power outage boolean. Meaning: The grid resilience score is calculated as the thermal comfort indicator during a power outage.
+
+DISTRICT WISE ELEC CONSUMPTION = ADDITIVE NET ELEC BUILDING?
 
 ---
 
@@ -69,13 +73,13 @@ Other variables not used directly in score/reward calculation can possibly be us
 ### Paper: [Exploiting Separability in Multiagent Planning with Continuous-State MDPs](https://lis.csail.mit.edu/pubs/amato-aamas14.pdf)
 **ABSTRACT:** Recent years have seen significant advances in techniques for optimally solving multiagent problems represented as decentralized partially observable Markov decision processes (Dec-POMDPs). A new method achieves scalability gains by converting Dec-POMDPs into continuous state MDPs. This method relies on the assumption of a centralized planning phase that generates a set of decentralized policies for the agents to execute. However, scalability remains limited when the number of agents or problem variables becomes large. In this paper, we show that, under certain separability conditions of the optimal value function, the scalability of this approach can increase considerably. This separability is present when there is locality of interaction,  which — as other approaches (such as those based on the ND-POMDP subclass) have already shown — can be exploited to improve performance. Unlike most previous methods, the novel continuous-state MDP algorithm retains optimality and convergence guarantees. Results show that the extension using separability can scale to a large number of agents and domain variables while maintaining optimality.
 
-##### Main takeaways:
+<!-- ##### Main takeaways:
 - A new method achieves scalability gains by converting decentralized partially observable Markov decision processes (Dec-POMDPs) into continuous state MDPs.
 - The paper shows that, under certain separability conditions of the optimal value function, the scalability of this approach can increase significantly.
 - The separability is based on locality of interaction which can be exploited to improve performance.
 - This novel approach retains optimality and convergence guarantees, unlike most previous methods.
 - Scalability is mentioned in form of number of agents and domain variables.
-
+ -->
 
 ### Summary:
 
@@ -95,6 +99,9 @@ Other variables not used directly in score/reward calculation can possibly be us
 
 <!-- ###### Dec-POMDPs conversion into continuous-state MDPs -->
 #### Dec-POMDPs
+
+JOINTLY FULLY OBSERVABLE
+
 A Dec-POMDP with $N$ agents is given by:
 $$
    \mathcal{P} \equiv (S, A, Z, p, r, \eta_0, T)
@@ -197,6 +204,21 @@ Value function is the sum of linear functions over factors. Also called: additiv
 The idea is that additive fully separable objective functions optimization can be reduced to independent optimization problems with lower dimensionalities. However, often it is not fully separable. The authors show weak separability can be exploited. The authors show that optimal value functions are additive **weakly-separable linear functions** (AWSL) of the occupancy states.  
 
 The theorem demonstrates that value functions can be represented using a finite set of low-dimensional vectors for each joint history. 
+
+---
+
+### Paper: [Optimally Solving Dec-POMDPs as Continuous-State MDPs](https://jair.org/index.php/jair/article/view/10986/26136)
+
+**ABSTRACT:** Decentralized partially observable Markov decision processes (Dec-POMDPs) provide a gen-eral model for decision-making under uncertainty in decentralized settings, but are difficult to solveoptimally (NEXP-Complete). As a new way of solving these problems, we introduce the idea oftransforming a Dec-POMDP into a continuous-state deterministic MDP with a piecewise-linear andconvex value function. This approach makes use of the fact that planning can be accomplished in acentralized offline manner, while execution can still be decentralized. This new Dec-POMDP for-mulation, which we call anoccupancy MDP, allows powerful POMDP and continuous-state MDPmethods to be used for the first time. To provide scalability,we refine this approach by combin-ing heuristic search and compact representations that exploit the structure present in multi-agentdomains, without losing the ability to converge to an optimal solution. In particular, we introducea feature-based heuristic search value iteration (FB-HSVI) algorithm that relies on feature-basedcompact representations, point-based updates and efficient action selection. A theoretical analysisdemonstrates that FB-HSVI terminates in finite time with an optimal solution. We include an ex-tensive empirical analysis using well-known benchmarks, thereby demonstrating that our approachprovides significant scalability improvements compared tothe state of the art.
+
+#### Summary:
+##### Introduction:
+
+Dec-POMDPs is the target domain, where multiple agents have to coordinate their actions in order to achieve common long-term goals while uncertainty is present in the effects of their actions and the information received by the agents (ex. noisy data, incomplete data). 
+
+*The decentralized partially observable Markov decision process (Dec-POMDP) is a standardformulation for cooperative decision-making in these sequential settings without instantaneous, freeand noiseless communication*
+
+<!-- *In the CityLearn environment * -->
 
 ---
 

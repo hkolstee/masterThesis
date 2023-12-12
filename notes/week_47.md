@@ -1,4 +1,4 @@
-# Notes Week 48
+# Notes Week 47
 ---
 ### Dynamics independency of CityLearn 2023:
 
