@@ -65,8 +65,6 @@ Problem description:
       P((s'_0 ... s'_n) | (s_0...s_n), (a_0 ... a_n))) = \prod_{i=0}^n P_i
   $$
 
-  <span style="color:red">(Probable) Contradiction with 2023 CityLearn MDP: The external feature (neighborhood level observation) of Carbon emission rate, is based on the ...</span>.
-
 - A factored, $n$-agent Dec-MDP is said to be **reward independent** if there exist $R_1$ and $R_2$ such that:
 
   $$
@@ -90,15 +88,58 @@ Problem description:
 - A **primitive event** is said to be **proper** if it can occur at most once in any possible history of a given MDP.
 - An **event** is said to be **proper** if it consists of mutually exclusive proper primitive event with respect to some given MDP.
 
-Given two histories for two agents $\Phi_1, \Phi_2$, a **joint reward structure** $\rho = [(E_1^1, E_1^2, c_1), ..., E_n^1, E_n^2, c_n]$
+Given two histories for two agents $\Phi_1, \Phi_2$, a **joint reward structure** $\rho = [(E_1^1, E_1^2, c_1), ..., E_n^1, E_n^2, c_n]$ specifies the reward (or penalty) $c_k$ that is added to the global value function.
+
+Due to the **transition independence** of the MDP, we can define underlying MDPs for each agent, even though the problem is not reward independent.
+
+Given a joint policy $(\pi_1...\pi_n)$ and a joint reward structure $\rho$, the **joint value** is:
+
+$$
+  JV(\rho | \pi_1...\pi_n) = \sum^{|\rho|}_{i=0} P(E_i^1|\pi_1) \cdot ... \cdot P(E_i^n|\pi_n)
+$$
+
+The **global value function** of a transition-independent Dec-MDP with respect to a joint policy is:
+
+$$
+  GV(\pi_1 ... \pi_n) = V_{\pi_1}(s_0^1) + ... + V_{\pi_n}(s_0^n) + JV(\rho | \pi_1 ... \pi_n),
+$$
+where the standard value of the underlying MDP for the agents is summed up and added to the joint value. 
+
+The **optimal joint policy**, denoted $(\pi_1 ... \pi_n)^*$, is a set of policies that maximize the global value function:
+
+$$
+  (\pi_1 ... \pi_n)^* = argmax_{\pi_1' ... \pi_n'}GV(\pi_1' ... \pi_n')
+$$
+
+**To summarize**, a problem in our transition-independent decentralized MDP framework is defined by underlying MDPs per agent $\langle S_i, A_i, P_i, R_i \rangle$ and a joint reward structure $\rho$.
 
 #### How does the CityLearn MDP satisfy these definition constraints?
 
 - [x] Definition **Dec-MDP**
 - [ ] Definition **n-factored Dec-MDP**
   - This constraints are satisfied before cost-free communication among agents. After, the factored agent states have observations that overlap, violating the strict separation constraint.
-- [ ] Definition **transition independent**
-  - The new local state of each agent does not depend on only its previous local state, the action of that agent, and the current external features. Namely, the external features ()
+- [x] Definition **transition independent**
+  - The new local state of each agent does only depend on the local state, the action the agent takes, and the current external features. The external features only depend on the previous external features. In the CityLearn environment, all shared observations are precalculated and independent of agent actions.
+- [x] Definition **observation independent**
+  - The observation an agent sees depends only on that agent's current and next local state and current action. Observations that are not pre-measured (and independent of agent actions) are: energy storage state of charge (heating, cooling, dhw, electrical) and energy consumption (heating, cooling, dhw, electrical), which are all dependent on each buildings own actions.
+  <!-- - The new local state of each agent does not depend on only its previous local state, the action of that agent, and the current external features. Namely, the external features () -->
 - [x] Definition **locally fully observable**
 - [ ] Definition **reward independent**
   - Neighborhood level electricity consumption involves other agent local state features (sum of building net electricity consumption).
+
+---
+
+### Paper: [Scaling Up Decentralized MDPs Through Heuristic Search](https://lis.csail.mit.edu/pubs/dibangoye-uai12.pdf)
+
+**Abstract**: Decentralized partially observable Markov decision processes (Dec-POMDPs) are rich models for cooperative decision-making under uncertainty, but are often intractable to solve optimally (NEXP-complete). The transition and observation independent Dec-MDP is a general subclass that has been shown to have complexity in NP, but optimal algorithms for this subclass are still inefficient in practice. In this paper, we first provide an updated proof that an optimal policy does not depend on the histories of the agents, but only the local observations. We then present a new algorithm based on heuristic search that is able to expand search nodes by using constraint optimization. We show experimental results comparing our approach with the state-of-the-art DecMDP and Dec-POMDP solvers. These results show a reduction in computation time and an increase in scalability by multiple orders of magnitude in a number of benchmarks.
+
+#### Summary
+The authors propose an algorithm that casts and Dec-MDP with independent transitions and observations as a continuous deterministic MDP where states are probability distributions over states in the original Dec-MDP, which they call occupancy distributions. Then, continuous MDP techniques can be used to solve the MDP. The algorithm performes state occupancy exploration similarly to learning real-time A* while the policy selection is in accordance with decentralized POMDP techniques. 
+
+A **history-dependent decision rule** $\sigma_i^\tau$ at time $\tau$ maps from $\tau$-step local action-observation histories $h_\tau^i$ to local actions: $\sigma_i^\tau(z_\tau^i) = a_\tau^i$ for all $\tau$-steps.
+
+The $\tau$-th **state occupancy** of a system under the control of a decentralized Markov policy $\langle \sigma_0 ... \sigma_{\tau-1}\rangle$ and starting at $\eta_0$ is given by:
+
+$$
+  \eta_\tau(s) = P(s | \sigma_{0:\tau-1}, \eta_0)\text{, for all } \tau \geq 1
+$$
