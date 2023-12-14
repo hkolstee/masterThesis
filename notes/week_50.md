@@ -138,8 +138,15 @@ The authors propose an algorithm that casts and Dec-MDP with independent transit
 
 A **history-dependent decision rule** $\sigma_i^\tau$ at time $\tau$ maps from $\tau$-step local action-observation histories $h_\tau^i$ to local actions: $\sigma_i^\tau(z_\tau^i) = a_\tau^i$ for all $\tau$-steps.
 
+A **markov decision rule** maps from local observations to local actions. 
+
 The $\tau$-th **state occupancy** of a system under the control of a decentralized Markov policy $\langle \sigma_0 ... \sigma_{\tau-1}\rangle$ and starting at $\eta_0$ is given by:
 
 $$
   \eta_\tau(s) = P(s | \sigma_{0:\tau-1}, \eta_0)\text{, for all } \tau \geq 1
 $$
+which are the probability distributions of ending up at a state given the history of Markov decision rules up to that point given a certain starting state, for each step of the $\tau$-steps
+
+The current state occupancy depends on the past decentralized Markov policy only though previous state occupancy and the previous Markov decision rule.
+
+The state occupancy is a **sufficient statistic** for decentralized Markov decision rules. 
