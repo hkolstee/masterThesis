@@ -147,6 +147,6 @@ $$
 $$
 which are the probability distributions of ending up at a state given the history of Markov decision rules up to that point given a certain starting state, for each step of the $\tau$-steps
 
-The current state occupancy depends on the past decentralized Markov policy only though previous state occupancy and the previous Markov decision rule.
+The current state occupancy depends on the past decentralized Markov policy only though previous state occupancy and the previous Markov decision rule. In other words, the state occupancy summarized all possible joint action-observation histories, decentralized Markov policy produced at horizon $\tau$ for the estimate of the joint decision rule. 
 
 The state occupancy is a **sufficient statistic** for decentralized Markov decision rules. 
