@@ -55,9 +55,24 @@ class CustomReward(RewardFunction):
             reward: List[float]
                 Comfort reward for transition to current timestep.
             """
-
             return unmetThermalComfort(observations)
 
-
-
+        def calculateEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -> float:
+            """Calculates the emissions component of the reward function. This component of the reward 
+            function consists of 1 key performance indicator: Carbon emissions (G).
+            
+            Parameters
+            ----------
+            observations: List[Mapping[str, Union[int, float]]]
+                List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
+                that are gotten from calling citylearn.building.Building.observations.
+                
+            Returns
+            -------
+            reward: List[float]
+                The sum of all building emissions devided by the baseline model emissions for a 
+                centralized agent setup, or a list of all building wise local emissions devided
+                by the baseline for each building.
+            """
+            return carbonEmissions(observations)
             
