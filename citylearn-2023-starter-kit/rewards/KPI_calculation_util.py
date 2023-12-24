@@ -66,7 +66,69 @@ def carbonEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -
                  for obs in observations]
     
     # NOTE: negative reward given in citylearn example docs
+    # NOTE: WHERE BASELINE?
     if self.central_agent:
-        reward = [sum(emissions) / len(reward_list)]
+        reward = [sum(emissions)]
     else:
-        reward = reward_list
+        reward = emissions
+        
+    return reward
+        
+def ramping(self, 
+            observations: List[Mapping[str, Union[int, float]]], 
+            prev_observations: List[Mapping[str, Union[int, float]]], 
+            ) -> [float]:
+    """Calculates the ramping of electricity consumption from last timestep to the
+    current over the entire grid.
+
+    Parameters
+    ----------
+    observations: List[Mapping[str, Union[int, float]]]
+        List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
+        that are gotten from calling citylearn.building.Building.observations.
+    prev_observations: List[Mapping[str, Union[int, float]]]
+        Observations from the previous timestep.
+
+    Returns
+    -------
+    reward_list: [float]
+        Ramping of electrical consumption for this timestep over entire grid.
+    """
+    
+    # calculate gridwise total energy consumption
+    net_elec_consumption = [obs["net_electricity_consumption"] for obs in observations]
+    prev_net_elec_consumption = [obs["net_electricity_consumption"] for obs in prev_observations]
+    grid_net_elec_consumption = sum(net_elec_consumption)
+    prev_grid_net_elec_consumption = sum(prev_net_elec_consumption)
+    
+    # absolute difference
+    abs_delta = abs(grid_net_elec_consumption - prev_grid_net_elec_consumption)
+    
+    if self.central_agent:
+        reward = [abs_delta]
+    else:
+        # NOTE: perhaps len(observations) gives a wrong len
+        reward = [abs_delta for i in range(len(observations))]            
+        
+    return reward
+    
+def loadFactor(self, 
+            observations: List[Mapping[str, Union[int, float]]], 
+            prev_observations: List[Mapping[str, Union[int, float]]], 
+            ) -> [float]:
+    """Ratio of daily average and peak consumption. This indicates the efficiency of electricity
+    consumption. Here, we give the 1 - load factor, as to minimize the reward.
+
+    Parameters
+    ----------
+    observations: List[Mapping[str, Union[int, float]]]
+        List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
+        that are gotten from calling citylearn.building.Building.observations.
+    prev_observations: List[Mapping[str, Union[int, float]]]
+        Observations from the previous timestep.
+
+    Returns
+    -------
+    reward_list: [float]
+        1 - load factor of the entire grid.
+    """
