@@ -238,7 +238,8 @@
     }
   },
   "reward_function": {
-    "type": "citylearn.reward_function.ComfortReward",
+    // "type": "citylearn.reward_function.ComfortReward",
+    "type": "rewards.user_reward.CustomReward",
     "attributes": {
       "band": 1.0,
       "lower_exponent": 2.0,

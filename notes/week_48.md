@@ -150,7 +150,7 @@ $h$ = Hours per day
 
 **P_d: Daily peak -> Average, maximum consumption at any time step per day.**
 
-NOTE: ESCALATED REWARD
+REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
 
 $$
 \begin{equation}
@@ -172,6 +172,8 @@ $h$ = Hours per day.
 ---
 
 **P_n : All-time peak -> Maximum consumption at any time step.**
+
+REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
 
 $$
 \begin{equation}
@@ -316,8 +318,6 @@ $$
     Resilience_t = \overline{M_t, S_t},
 \end{equation}
 $$
-
-NOTE FROM MEETINGl TRANSITION INDEPENDENT DECENTRALIZED MDP
 
 where these 4 reward components are made up of 8 key performance indicators (KPIs): carbon emissions (G), discomfort (U), ramping (R), 1 - load factor (L), daily peak (Pd), all-time peak (Pn) 1 - thermal resilience (M), and normalized unserved energy (S). 
 
