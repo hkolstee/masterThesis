@@ -39,7 +39,7 @@ $$
 \end{equation}
 $$
 
-where these 4 scores are made up of 8 key performance indicators (KPIs): carbon emissions (G), discomfort (U), ramping (R), 1 - load factor (L), daily peak (P_d), all-time peak (P_n) 1 - thermal resilience (M), and normalized unserved energy (S). 
+where these 4 scores are made up of 8 key performance indicators (KPIs): carbon emissions (G), discomfort (U), ramping (R), 1 - load factor (L), daily peak (P_d), all-time peak (P_n), thermal resilience (M), and normalized unserved energy (S). 
 
 The grid control and resilience control scores are averages over their KPIs. 
 
@@ -423,7 +423,7 @@ $$
 TO ->
 $$
 \begin{equation}
-    l_t = 1 - \frac{(\sum^{t}_{i = t - h} E_{i})\div h}{max(E_{t-h}, E_{t-h+1} ..., E_{t})}
+    l_t = 1 - \frac{(\sum^{t}_{i = d \cdot h} E_{i})\div (t - d \cdot h)}{max(E_{d \cdot h}, E_{d \cdot h+1} ..., E_{t})}
 \end{equation}
 $$
 where:
@@ -496,7 +496,7 @@ $t$ = Current time step
 
 ---
 
-**M: 1 - thermal resilience -> Same as unmet hours (thermal comfort) U but only considers time steps when there is power outage.**
+**M: thermal resilience -> Same as unmet hours (thermal comfort) U but only considers time steps when there is power outage.**
 
 $$
 \begin{equation}
