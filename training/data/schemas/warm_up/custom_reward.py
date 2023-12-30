@@ -133,10 +133,10 @@ class CustomReward(RewardFunction):
         grid = self.calculateGrid(observations)
         resilience = self.calculateResilience(observations)
 
-        # print(comfort)
-        # print(emissions)
-        # print(grid)
-        # print(resilience)
+        # print("c", comfort)
+        # print("e", emissions)
+        # print("g", grid)
+        # print("r", resilience)
 
         # weights based on 2023 citylearn challenge control track score
         reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
@@ -237,6 +237,9 @@ class CustomReward(RewardFunction):
 
         m = self.thermalResilience(observations)
         s = self.normalizedUnservedEnergy(observations)
+
+        # print("m", m)
+        # print("s", s)
 
         # average over KPIs
         reward = (m + s) / 2
@@ -575,7 +578,7 @@ class CustomReward(RewardFunction):
 
 
                 # reward is ratio between realized and unserved energy demands.
-                reward = expected / served
+                reward = served / expected
 
             # no power outage
             else:
