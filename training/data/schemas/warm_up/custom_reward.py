@@ -577,8 +577,9 @@ class CustomReward(RewardFunction):
                 
 
 
-                # reward is ratio between realized and unserved energy demands.
-                reward = served / expected
+                # reward is 1 minus ratio between realized and unserved energy demands.
+                # NOTE: different from the docs, there they just take the ratio
+                reward = 1 - (served / expected)
 
             # no power outage
             else:

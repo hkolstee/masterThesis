@@ -262,7 +262,7 @@
     }
   },
   "reward_function": {
-    "type": "custom_reward.CustomReward",
+    "type": "custom_reward.CustomRewardafsafsa",
     "attributes": {
       "band": 1.0,
       "lower_exponent": 2.0,
