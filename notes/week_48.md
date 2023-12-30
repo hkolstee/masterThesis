@@ -150,8 +150,6 @@ $h$ = Hours per day
 
 **P_d: Daily peak -> Average, maximum consumption at any time step per day.**
 
-REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
-
 $$
 \begin{equation}
     P_{d} = p_{d_{control}} \div p_{d_{baseline}},
@@ -172,8 +170,6 @@ $h$ = Hours per day.
 ---
 
 **P_n : All-time peak -> Maximum consumption at any time step.**
-
-REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
 
 $$
 \begin{equation}
@@ -437,6 +433,9 @@ $t$ = Current time step
 
 **Pd: Daily peak -> maximum consumption at any time step of this day.**
 
+REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
+
+
 $$
 \begin{equation}
     Pd = pd_{t} \div pd_{t}^{baseline},
@@ -465,6 +464,8 @@ $t$ = Current timestep
 ---
 
 **P_n : All-time peak -> Maximum consumption at any time step.**
+
+REVISED: LOOK AT [NOTES WEEK 51](week_51.md)
 
 How will this be incoorporated step-wise?
 

@@ -7,7 +7,7 @@ from citylearn.citylearn import EvaluationCondition
 #####                Specify your reward here                 #####
 ###################################################################
 
-# NOTE: U, M, and S all KPIs are normalized by their baseline value 
+# NOTE: All but U, M, and S KPIs are normalized by their baseline value 
 # where the baseline is the result from when none of the distributed 
 # energy resources (DHW storage system, battery, and heat pump) is 
 # controlled.
@@ -33,27 +33,67 @@ class CustomReward(RewardFunction):
         self.all_time_peak = 0.0
         # used to calculate average of the day until the current timestep
         self.total_elec_today = 0.0
+        self.total_elec_today_baseline = 0.0
         # net elec consumption over grid for current and previous timestep
         self.grid_net_elec_consumption = 0.0
         self.prev_grid_net_elec_consumption = 0.0
+        self.grid_net_elec_consumption_baseline = 0.0
+        self.prev_net_elec_consumption_baseline = []
+        self.prev_grid_net_elec_consumption_baseline = 0.0
+        
+        def get_metadata(self):
+            return self.env_metadata
 
         def pre_calc_variables(self, observations: List[Mapping[str, Union[int, float]]]) -> List[float]:
-            """For efficiency purposes. Variables in this function are used multiple times in different 
-            functions"""
+            """For efficiency purposes. Variables computed in this function are used multiple times in 
+            different class methods."""
 
             # grid level total energy consumption
             self.grid_net_elec_consumption = sum([obs["net_electricity_consumption"] for obs in observations])
+            # for use in baseline calculations
+            self.net_elec_consumption_baseline = []
+            for obs in observations:
+                if not obs["power_outage"]:
+                    consumption = 0.0
+                else: 
+                    # We base this on demand, as demands are satisfied optimally, either through storage or 
+                    # device energy. For the baseline, no storage is available, therefore all demand will 
+                    # supplied through electrical energy from the grid.
+                    consumption = (obs["cooling_demand_without_control"] 
+                                   + obs["heating_demand_without_control"]
+                                   + obs["dhw_demand_without_control"] 
+                                   + obs["non_shiftable_load_without_control"])
+                self.net_elec_consumption_baseline.append(consumption)
+                
+            self.grid_net_elec_consumption_baseline = sum(self.net_elec_consumption_baseline)
 
             # 1 if building is occupied, 0 otherwise
             self.occupations = [0 if obs['occupant_count'] == 0 else 1 for obs in observations]
 
             # temperature difference to setpoint
             indoor_temp_deltas = [abs(obs["indoor_dry_bulb_temperature_set_point"] 
-                                    - obs["indoor_dry_bulb_temperature"]) for obs in observations]
+                                      - obs["indoor_dry_bulb_temperature"]) 
+                                  for obs in observations]
             # 1 if building thermal comfort is not satisfied, 0 if it is satisfied
             # in the citylearn documentation a default temperature band of 2.0 is used
             self.thermal_comfort_violations = [1 if delta > 2.0 else 0 for delta in indoor_temp_deltas]
-
+            
+            # daily peak needs to be reset if it is a new day (hour = [1...24])
+            if (observations[0]["hour"] == 1):
+                self.daily_peak = 0.0
+                self.daily_peak_baseline = 0.0
+            
+            # if a new peak is achieved, we need to know the difference to the last daily peak
+            if (self.grid_net_elec_consumption > self.daily_peak):
+                self.peak_delta = self.grid_net_elec_consumption - self.daily_peak
+                self.daily_peak = self.grid_net_elec_consumption
+            else:
+                self.peak_delta = 0.0
+            if (self.grid_net_elec_consumption_baseline > self.daily_peak_baseline):
+                self.peak_delta_baseline = self.grid_net_elec_consumption_baseline - self.daily_peak_baseline
+                self.daily_peak_baseline = self.grid_net_elec_consumption_baseline
+            else: 
+                self.peak_delta_baseline - 0.0
 
         def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> List[float]:
             """Calculates the rewards.
@@ -70,8 +110,6 @@ class CustomReward(RewardFunction):
                 Reward for transition to current timestep.
             """
 
-            print(observations[0])
-
             # pre calculate some instance variables for efficiency purposes
             pre_calc_variables(observations)
             
@@ -80,20 +118,26 @@ class CustomReward(RewardFunction):
             if (self.previous_observations != None):
                 # for first timestep only
                 self.prev_grid_net_elec_consumption = self.grid_net_elec_consumption
-
+                self.prev_grid_net_elec_consumption_baseline = self.grid_net_elec_consumption_baseline
+                self.prev_net_elec_consumption_baseline = self.net_elec_consumption_baseline
+                
             # the four components of our reward
             comfort = calculateComfort(observations)
             emissions = calculateEmissions(observations)
-            grid = calculateGrid(observations, self.previous_observations)
+            grid = calculateGrid(observations)
             resilience = calculateResilience(observations)
 
             # weights based on 2023 citylearn challenge control track score
-            reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
+            # reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
+            reward = 1.0 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
 
             # save this net elec consumption as the previous observation
             self.prev_grid_net_elec_consumption = self.grid_net_elec_consumption
+            self.prev_grid_net_elec_consumption_baseline = self.grid_net_elec_consumption_baseline
+            self.prev_net_elec_consumption_baseline = self.net_elec_consumption_baseline
 
-            return reward
+            # negative such that algorithms can maximize the reward
+            return -reward
 
         def calculateComfort(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
             """Calculates the comfort component of the reward function. This component of the reward 
@@ -152,13 +196,15 @@ class CustomReward(RewardFunction):
                 The average over the 4 KPIs.
             """
 
-            r = ramping(observations, self.prev_observations)
-            l = loadFactor(observations)
+            r = ramping(observations)
+            # order of dailyPeak() and loadFactor() important!
+            #   the daily peak gets updated which is important for the load factor calculation.
             d = dailyPeak(observations)
+            l = loadFactor(observations)
             a = allTimePeak(observations)
             
             # average
-            reward = (r + l + d + a) / 4
+            reward = (r + d + l + a) / 4
  
             return reward
 
@@ -206,8 +252,8 @@ class CustomReward(RewardFunction):
 
             # rewards
             reward_list = []
-            for violation, occupants in zip(self.thermal_comfort_violations, self.occupations):
-                if (violation and occupants):
+            for violation, occupancy in zip(self.thermal_comfort_violations, self.occupations):
+                if (violation and occupancy):
                     reward_list.append(1)
                 else:
                     reward_list.append(0)
@@ -217,6 +263,8 @@ class CustomReward(RewardFunction):
                 reward = [sum(reward_list) / len(reward_list)]
             else:
                 reward = reward_list
+                
+            return reward
 
         # NOTE: Baseline
         def carbonEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
@@ -234,19 +282,29 @@ class CustomReward(RewardFunction):
             reward_list: [float]
                 Carbon emissions devided by baseline.
             """
-            emissions = [max(0, obs["net_electricity_consumption"] * obs["carbon_intensity"]) 
-                        for obs in observations]
             
-            # NOTE: negative reward given in citylearn example docs
-            # NOTE: WHERE BASELINE?
+            emissions = 0.0
+            emissions_baseline = 0.0
+            for idx, obs in enumerate(observations):
+                # emission
+                emissions += max(0, obs["net_electricity_consumption"] * obs["carbon_intensity"]) 
+                
+                # baseline                
+                emissions_baseline += max(0, self.net_elec_consumption_baseline[idx] * obs["carbon_intensity"])
+                            
+            # devision by 0.0 check
+            if (emissions_baseline == 0.0):
+                reward = 0.0
+            else: 
+                reward = emissions / emissions_baseline
+                            
             if self.central_agent:
-                reward = [sum(emissions)]
+                reward = [reward]
             else:
-                reward = emissions
+                reward = [reward for i in range(len(observations))]
                 
             return reward
             
-        # NOTE: Baseline
         def ramping(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
             """Calculates the ramping of electricity consumption from last timestep to the
             current over the entire grid.
@@ -256,8 +314,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -268,11 +324,20 @@ class CustomReward(RewardFunction):
             # absolute difference
             abs_delta = abs(self.grid_net_elec_consumption - self.prev_grid_net_elec_consumption)
             
-            if self.central_agent:
-                reward = [abs_delta]
+            # baseline
+            abs_delta_baseline = abs(self.grid_net_elec_consumption_baseline
+                                     - self.prev_grid_net_elec_consumption_baseline)
+            
+            # zero devision check
+            if (abs_delta_baseline == 0.0):
+                reward = 0.0
             else:
-                # NOTE: perhaps len(observations) gives a wrong len
-                reward = [abs_delta for i in range(len(observations))]            
+                reward = abs_delta / abs_delta_baseline
+            
+            if self.central_agent:
+                reward = [reward]
+            else:
+                reward = [reward for i in range(len(observations))]            
                 
             return reward
         
@@ -286,8 +351,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -298,19 +361,27 @@ class CustomReward(RewardFunction):
             # needs to be reset if it is a new day (hour = [1...24])
             if (observations[0]["hour"] == 1):
                 self.total_elec_today = 0.0
+                self.total_elec_today_baseline = 0.0
             
             # calculate average of today till the current step
             self.total_elec_today += self.grid_net_elec_consumption
             average = self.total_elec_today / observations[0]["hour"]
+            # baseline
+            self.total_elec_today_baseline += self.grid_net_elec_consumption_baseline
+            average_baseline = self.total_elec_today_baseline / observations[0]["hour"]
 
             # calculate ratio
-            load_factor = average / self.daily_peak
+            load_factor = 1 - (average / self.daily_peak)
+            load_factor_baseline = 1 - (average_baseline / self.daily_peak_baseline)
+            
+            # normalize
+            reward = load_factor / load_factor_baseline
 
             if self.central_agent:
-                reward = [1 - load_factor]
+                reward = [reward]
             else:
                 # NOTE: perhaps len(observations) gives a wrong len
-                reward = [(1 - load_factor) for i in range(len(observations))]  
+                reward = [reward for i in range(len(observations))]  
 
         # NOTE: Baseline
         def dailyPeak(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
@@ -321,8 +392,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -331,27 +400,32 @@ class CustomReward(RewardFunction):
                 and the current consumption if it is higher. 
             """
 
-            # needs to be reset if it is a new day (hour = [1...24])
-            if (observations[0]["hour"] == 1):
-                self.daily_peak = 0
+            # Score calculation = average over all days
+            #   therefore, to reflect the score calculation in this reward
+            #   the reward should be devided by the number of days in the 
+            #   simulation. We can see the number of days in the metadata.
             
-            # new peak consumption
-            if (self.grid_net_elec_consumption > self.daily_peak):
-                # set new peak
-                self.daily_peak = self.grid_net_elec_consumption
-                # reward is difference 
-                delta = self.grid_net_elec_consumption - self.daily_peak
-
-            # NOTE: WHERE BASELINE?
-            if self.central_agent:
-                reward = [delta]
+            # zero devision check
+            if (self.peak_delta_baseline == 0.0):
+                reward = 0.0
             else:
-                # NOTE: perhaps len(observations) gives a wrong len
-                reward = [delta for i in range(len(observations))]            
+                reward = self.peak_delta / self.peak_delta_baseline   
+                
+            # Daily peak Score calculation = average over all days
+            #   therefore, to reflect the score calculation in this reward
+            #   the reward should be devided by the number of days in the 
+            #   simulation. We can see the number of days in the metadata.
+            reward /= (env_metadata["simulation_time_steps"] 
+                      * (env_metadata["seconds_per_time_step"] 
+                         / (60*60*24)))
+
+            if self.central_agent:
+                reward = [reward]
+            else:
+                reward = [reward for i in range(len(observations))]            
                 
             return reward
 
-        # NOTE: Baseline
         def allTimePeak(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
             """All-time peak as escalated reward.
 
@@ -360,8 +434,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -370,18 +442,30 @@ class CustomReward(RewardFunction):
                 and the current consumption if it is higher. 
             """
             
+            delta = 0
+            delta_baseline = 0
+            
             # new peak consumption
             if (self.grid_net_elec_consumption > self.all_time_peak):
                 # set new peak
                 self.all_time_peak = self.grid_net_elec_consumption
                 # reward is difference 
                 delta = self.grid_net_elec_consumption - self.daily_peak
+                
+            # baseline
+            if (self.grid_net_elec_consumption_baseline > self.all_time_peak):
+                delta_baseline = self.grid_net_elec_consumption_baseline - self.all_time_peak
+                
+            # zero devision check
+            if (delta_baseline == 0.0):
+                reward = 0.0
+            else:
+                reward = delta / delta_baseline   
 
             if self.central_agent:
-                reward = [delta]
+                reward = [reward]
             else:
-                # NOTE: perhaps len(observations) gives a wrong len
-                reward = [delta for i in range(len(observations))]            
+                reward = [reward for i in range(len(observations))]             
                 
             return reward
         
@@ -394,8 +478,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -420,6 +502,8 @@ class CustomReward(RewardFunction):
                 reward = [sum(reward_list) / len(reward_list)]
             else:
                 reward = reward_list
+                
+            return reward
 
         def normalizedUnservedEnergy(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
             """Proportion of unmet demand due to supply shortage in a power outage.
@@ -429,8 +513,6 @@ class CustomReward(RewardFunction):
             observations: List[Mapping[str, Union[int, float]]]
                 List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
                 that are gotten from calling citylearn.building.Building.observations.
-            prev_observations: List[Mapping[str, Union[int, float]]]
-                Observations from the previous timestep.
 
             Returns
             -------
@@ -453,13 +535,24 @@ class CustomReward(RewardFunction):
                     # served = obs["cooling_electricity_consumption"] + obs["heating_electricity_consumption"]\
                     #          + obs["dhw_storage_electricity_consumption"] + obs[""]
 
-                    # NOTE: NONE OF THESE ARE GIVEN FOR THE ENVIRONMENT
-                    served = obs["cooling_electricity_consumption"]\
-                             + obs["heating_electricity_consumption"]\
-                             + obs["dhw_electricity_consumption"]\
-                             + obs["solar_generation"] # or - solar gen, but I think it is negative already
-                            #  + obs["non_shiftable_load_electricity_consumption"]
-                            # NOTE: WHERE IS ELECTRICAL STORAGE ELECTRICITY CONSUMPTION?
+                    # NOTE: These are legitimate observations, but not active in the citylearn challenge
+                    # ..._storage_electricity_consumption = 
+                    #       Positive values indicate `..._device` electricity consumption to charge `..._storage` 
+                    #       while negative values indicate avoided `..._device` electricity consumption by 
+                    #       discharging `cooling_storage` to meet `..._demand`.
+                    served = abs(obs["cooling_storage_electricity_consumption"]
+                                 + obs["heating_storage_electricity_consumption"]
+                                 + obs["dhw_storage_electricity_consumption"]
+                                 + obs["electrical_storage_electricity_consumption"])
+                    # OR 
+                    # ..._electricity_consumption = 
+                    #       `..._device` net electricity consumption in meeting cooling demand and `..._storage` energy 
+                    #       demand time series, in [kWh]. 
+                    # served = abs(obs["cooling_electricity_consumption"]
+                    #              + obs["heating_electricity_consumption"]
+                    #              + obs["dhw_electricity_consumption"]
+                    #              + obs["electrical_electricity_consumption"])
+                            
                     # in docs cost functions: served_energy = b.energy_from_cooling_device + b.energy_from_cooling_storage\
                                                                 # + b.energy_from_heating_device + b.energy_from_heating_storage\
                                                                     # + b.energy_from_dhw_device + b.energy_from_dhw_storage\
@@ -470,21 +563,66 @@ class CustomReward(RewardFunction):
                     # reward is ratio between realized and unserved energy demands.
                     reward = expected / served
 
-                    reward_list.append(reward)
                 # no power outage
                 else:
-                    reward = [0.0]
+                    reward = 0.0
+                    
+                reward_list.append(reward)
             
             if self.central_agent:
                 reward = [sum(reward_list) / len(reward_list)]
             else:
                 reward = reward_list
 
+        def unservedEnergyAlternative(self, observations: List[Mapping[str, Union[int, float]]]) -> [float]:
+            """Alternative to unmet demand due to power outage. This reward is a simplified rough estimation 
+            of the unmet demand by just using the current demand if there is a power outage. 
+            
+            This can be seen as a rough estimate, as when demands can not be met, the following demands will
+            (probably) be even greater to meet optimal thermal comfort. If there is a power outage, the 
+            storage devices will optimally meet these demands untill they are empty, which keeps the 
+            indoor temperature close to the optimal. Once they are empty, the temperature will divert from
+            the optimal, resulting in larger demands. Therefore, the thought process is that the higher the
+            current demand, the larger the unmet demand has been.
+
+            Parameters
+            ----------
+            observations: List[Mapping[str, Union[int, float]]]
+                List of all buildings observations at current citylean.citylearn.CityLearnEnv.time_step
+                that are gotten from calling citylearn.building.Building.observations.
+            prev_observations: List[Mapping[str, Union[int, float]]]
+                Observations from the previous timestep.
+
+            Returns
+            -------
+            reward_list: [float]
+                
+            """
+            
+            reward_list = []
+            for obs in observations:
+                # current building power outage
+                if obs["power_outage"]:
+                    reward = obs["cooling_demand"] + obs["heating_demand"] + obs["dhw_demand"]
+                else: 
+                    reward = 0.0
+                reward_list.append(reward)
+                
+            if self.central_agent:
+                reward = [sum(reward_list) / len(reward_list)]
+            else:
+                reward = reward_list
+
+
         def reset(self):
             """Used to reset variables at the start of an episode."""
 
-            self.previous_observations = None
             self.daily_peak = 0.0
             self.all_time_peak = 0.0
             self.total_elec_today = 0.0
+            self.total_elec_today_baseline = 0.0
             self.grid_net_elec_consumption = 0.0
+            self.prev_grid_net_elec_consumption = 0.0
+            self.grid_net_elec_consumption_baseline = 0.0
+            self.prev_net_elec_consumption_baseline = []
+            self.prev_grid_net_elec_consumption_baseline = 0.0
