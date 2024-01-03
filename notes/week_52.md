@@ -123,53 +123,9 @@
 
 ### First results
 
-#### Relaxed:
+#### Using the energy reward function given in by the challenge
 
-Relaxed after 20 epoch/ 500 epoch: 
-
-name |	Building_1 | Building_2 |	Building_3 | District|
------|-------------|-----------|-----------|---------|
-cost_function				
-annual_normalized_unserved_energy_total	|0.028435|	0.021880|	0.026368|	0.025561
-| |0.043612|	0.034839	|0.022205|	0.033552
-annual_peak_average	|NaN	|NaN	|NaN	|0.824677
-||NaN	|NaN|	NaN	|0.680509
-carbon_emissions_total	|0.673362	|0.895182|	0.830995	|0.799846
-||0.368648	|0.388671	|0.478098	|0.411806
-cost_total|	0.645915	|0.851934|	0.800669|	0.766173
-||	0.362068	|0.370061	|0.453815	|0.395315
-daily_one_minus_load_factor_average|	NaN|	NaN|	NaN|	1.099002
-||NaN	|NaN	|NaN|	1.224610
-daily_peak_average	|NaN|	NaN|	NaN|	0.869741
-||	NaN	|NaN|	NaN|	0.606193
-discomfort_delta_average	|1.014534|	0.973325|	0.268143|	0.752001
-||9.239667	|7.000887|	7.906140|	8.048898
-discomfort_delta_maximum	|8.919123	|11.037985|	5.922489|	8.626532
-||16.679779	|14.778639|	13.923975|	15.127464
-discomfort_delta_minimum|	-9.583345|	-8.084770|	-4.065001|	-7.244372
-||-0.123569|	-0.581318|	-0.372210|	-0.359032
-discomfort_proportion	|0.600281|	0.516791|	0.286190|	0.467754
-||	0.981767	|0.977612|	0.978369|	0.979250
-discomfort_too_cold_proportion	|0.173913|	0.147388|	0.088186|	0.136496
-||	0.000000|	0.000000|	0.000000|	0.000000
-discomfort_too_hot_proportion	|0.426367|	0.369403|	0.198003|	0.331258
-||	0.981767|	0.977612|	0.978369|	0.979250
-electricity_consumption_total	|0.690403|	0.910707|	0.848112|	0.816407
-||	0.369596|	0.393878|	0.483236|	0.415570
-monthly_one_minus_load_factor_average	|NaN|	NaN|	NaN|	1.028323
-||	NaN	|NaN|	NaN	|1.102825
-one_minus_thermal_resilience_proportion	|0.333333	|0.571429|	0.200000|	0.368254
-||	1.000000|	1.000000|	1.000000|	1.000000
-power_outage_normalized_unserved_energy_total	|0.713369|	0.569394|	0.702040|	0.661601
-||	0.672167|	0.625904|	0.624914|	0.640995
-ramping_average	|NaN	|NaN	|NaN|	1.410598
-||	NaN	|NaN|	NaN|	0.773802
-zero_net_energy	|0.580739|	0.794432|	0.815752|	0.730308
-||	0.281915	|0.359632|	0.449702|	0.363750
-
-
-#### Complete reward func:
-
+20 epoch/ 500 epoch: 
 
 name	|Building_1	|Building_2|	Building_3|	District|
 -------|----------|------------|------------|-----------|
@@ -210,3 +166,34 @@ ramping_average|	NaN|	NaN|	NaN|	1.357430
 ||	NaN|	NaN|	NaN|	<span style="color:green;">0.736733</span>
 zero_net_energy|	0.575715|	0.902347|	0.747688|	0.741916
 ||	0.279682|	0.369444	|0.456251|	<span style="color:green;">0.368459</span>
+
+---
+
+## Paper: [Ten questions concerning reinforcement learning for building energy management](https://www.sciencedirect.com/science/article/pii/S0360132323004626)
+
+ABSTRACT: As buildings account for approximately 40% of global energy consumption and associated greenhouse gas emissions, their role in decarbonizing the power grid is crucial. The increased integration of variable energy sources, such as renewables, introduces uncertainties and unprecedented flexibilities, necessitating buildings to adapt their energy demand to enhance grid resiliency. Consequently, buildings must transition from passive energy consumers to active grid assets, providing demand flexibility and energy elasticity while maintaining occupant comfort and health. This fundamental shift demands advanced optimal control methods to manage escalating energy demand and avert power outages. Reinforcement learning (RL) emerges as a promising method to address these challenges. In this paper, we explore ten questions related to the application of RL in buildings, specifically targeting flexible energy management. We consider the growing availability of data, advancements in machine learning algorithms, open-source tools, and the practical deployment aspects associated with software and hardware requirements. Our objective is to deliver a comprehensive introduction to RL, present an overview of existing research and accomplishments, underscore the challenges and opportunities, and propose potential future research directions to expedite the adoption of RL for building energy management.
+
+### Main takeaways:
+
+### Summary:
+
+#### Introduction
+
+Out of building energy use, over 40% is spend on maintaining thermal comfort, particularly by heating, ventilating and air-conditioning (HVAC) systems. Also, humans spend 86% of their life indoors. Increasingly, building control systems are expected to consider additional goals like flexibility, carbon emissions, and managing onsite renewable energy production and storage. Additionaly, human occupancy can be more actively considered in these systems.
+
+10 questions are discussed in the paper. Question 1-4 serve as a general introduction and background to RL. Question 5-8 adress practical questions for RL in buildings. Question 9-10 address the challenges and future opportunities.
+
+#### Questions
+<u>*Q1: What is reinforcement learning and what is its promise in buildings?*</u>
+
+Conventional rule based systems are based on expert experience and greatly lack adaptability. Additionally, they are reactive and do not take into account forecasts.
+
+MPC requires the development of control models which capture the dynamic behavior of the building and its HVAC systems, of which every building is unique, requiring extensive research to develop and maintain an accurate control model for each building.
+
+<u>*Q2: how is RL related to other control theory methods?*</u>
+
+Here, a comparison is made between RBC, MPC, RLC. Table:
+
+![The comparison of RBC, MPC, and RLC](images/control_comparison.PNG)
+
+<u>*Q3: What are different types of RL algorithms and what are their advantages and disadvantages?*</u>
