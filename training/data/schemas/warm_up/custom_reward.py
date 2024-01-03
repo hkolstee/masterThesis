@@ -140,7 +140,6 @@ class CustomReward(RewardFunction):
 
         # weights based on 2023 citylearn challenge control track score
         reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
-        # reward = 1.0 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
 
         # save this net elec consumption as the previous observation
         self.prev_grid_net_elec_consumption = self.grid_net_elec_consumption
@@ -307,10 +306,16 @@ class CustomReward(RewardFunction):
             emissions_baseline += max(0, self.net_elec_consumption_baseline[idx] * obs["carbon_intensity"])
                         
         # devision by 0.0 check
-        if (math.isclose(emissions_baseline, 0.0)):
+        if (emissions_baseline < 0.001):
             reward = 0.0
         else: 
             reward = emissions / emissions_baseline
+            
+        
+            
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("Carbon emissions")
+            reward = 0.0
                         
         if self.central_agent:
             reward = [reward]
@@ -343,10 +348,13 @@ class CustomReward(RewardFunction):
                                     - self.prev_grid_net_elec_consumption_baseline)
         
         # zero devision check
-        if (math.isclose(abs_delta_baseline, 0.0)):
+        if (abs_delta_baseline < 0.001):
             reward = 0.0
         else:
             reward = abs_delta / abs_delta_baseline
+            
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("Ramping")
         
         if self.central_agent:
             reward = [reward]
@@ -385,12 +393,15 @@ class CustomReward(RewardFunction):
         
   
         # zero devision check
-        if (math.isclose(load_factor_baseline, 0.0)):
+        if (load_factor_baseline < 0.01):
             reward = 0.0
         else:
             # normalize
             reward = load_factor / load_factor_baseline
 
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("Load factor")
+            reward = 0.0
 
         if self.central_agent:
             reward = [reward]
@@ -423,7 +434,7 @@ class CustomReward(RewardFunction):
         #   simulation. We can see the number of days in the metadata.
         
         # zero devision check
-        if (math.isclose(self.peak_delta_baseline, 0.0)):
+        if (self.peak_delta_baseline < 0.01):
             reward = 0.0
         else:
             reward = self.peak_delta / self.peak_delta_baseline   
@@ -435,6 +446,9 @@ class CustomReward(RewardFunction):
         reward /= (self.env_metadata["simulation_time_steps"] 
                     * (self.env_metadata["seconds_per_time_step"] 
                         / (60*60*24)))
+        
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("Daily peak")
 
         if self.central_agent:
             reward = [reward]
@@ -474,10 +488,13 @@ class CustomReward(RewardFunction):
             delta_baseline = self.grid_net_elec_consumption_baseline - self.all_time_peak
             
         # zero devision check
-        if (math.isclose(delta_baseline, 0.0)):
+        if (delta_baseline < 0.001):
             reward = 0.0
         else:
             reward = delta / delta_baseline   
+            
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("All-time peak")
 
         if self.central_agent:
             reward = [reward]
@@ -518,7 +535,7 @@ class CustomReward(RewardFunction):
         if self.central_agent:
             reward = [sum(reward_list) / len(reward_list)]
         else:
-            reward = reward_list
+            reward = reward_list            
             
         return np.array(reward)
 
@@ -584,6 +601,9 @@ class CustomReward(RewardFunction):
             # no power outage
             else:
                 reward = 0.0
+                
+            if (math.isnan(reward) or math.isinf(reward)):
+                print("Unserved")
                 
             reward_list.append(reward)
         
