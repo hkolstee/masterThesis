@@ -197,3 +197,6 @@ Here, a comparison is made between RBC, MPC, RLC. Table:
 ![The comparison of RBC, MPC, and RLC](images/control_comparison.PNG)
 
 <u>*Q3: What are different types of RL algorithms and what are their advantages and disadvantages?*</u>
+- Value based
+- Actor-critic
+- Policy gradient
