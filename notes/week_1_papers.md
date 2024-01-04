@@ -2,4 +2,22 @@
 
 ---
 
-Paper: 
+## Paper: [Producing Efficient Error-bounded Solutions for Transition Independent Decentralized MDPs](https://hal.science/file/index/docid/918066/filename/fp721-Dibangoye.pdf)
+
+ABSTRACT: There has been substantial progress on algorithms for single-agent sequential decision making using partially observable Markov decision processes (POMDPs). A number of efficient algorithms for solving POMDPs share two desirable properties: error-bounds and fast convergence rates. Despite significant efforts, no algorithms for solving decentralized POMDPs benefit from these properties, leading to either poor solution quality or limited scalability. This paper presents the first approach for solving transition independent decentralized Markov decision processes (Dec-MDPs), that inherits these properties. Two related algorithms illustrate this approach. The first recasts the original problem as a deterministic and completely observable Markov decision process. In this form, the original problem is solved by combining heuristic search with constraint optimization to quickly converge into a near-optimal policy. This algorithm also provides the foundation for the first algorithm for solving infinite-horizon transition independent decentralized MDPs. We demonstrate that both methods outperform state-of-the-art algorithms by multiple orders of magnitude, and for infinite-horizon decentralized MDPs, the algorithm is able to construct more concise policies by searching cyclic policy graphs.
+
+**Notes**
+
+*Decentralized decision rule:* a N-tuple of decision rules, one per agent. Each individual decision rule is a mapping from *local information* about the states of the process at the current step to local actions.
+
+*History-dependent decision rule:* is a mapping from local action-observation histories, to local actions. A policy that consists of history-dependent decision rules defines a history-dependent policy. Standard approaches for solving decentralized MDPs (and Dec-POMDPs) search in the space of history-dependent policies.
+
+*Markovian decision rule:* is a mapping of local observations to actions. This is called a Markovian polcy. Here, the search space is significantly smaller. It is shown that under transition independent assumptions, there always exist a Markovian policy that achieves performance at least as good as any history-dependent policy.
+
+*Markovian policy graphs:* are used in the paper to repersent Markovian policies for both inifinite and finite horizon problems. Denoted as: ($X, \sum, v, \mu, x_0$), where $X$ is the set of nodes in the graph, $\sum$ is the set of decision rules (edges), $v: X \mapsto \sum$ describes the mapping that determines the decision rule $v(c)$ to be executes when the graph is in node $x$, mapping $\mu: X \mapsto X$ is the deterministic transition function, providing the next graph node for each node.
+
+*Sufficient statistic*: a probability distribution of which the sample it is calculated from gives no additional information than the statistic itself. A sufficient statistic summarizes all of the information in a sample about a chosen parameter. For example, the sample mean, x̄, estimates the population mean, μ. x̄ is a sufficient statistic if it retains all of the information about the population mean that was contained in the original data points.
+
+*Occupancy state*: $\eta_\tau$ where $\forall \overline{s}: \eta_\tau(\overline{s}) = P(s_\tau = \overline{s}| \eta_0, \sigma_0, ..., \sigma_{\tau - 1})$ represents a probability distribution over states given an initial state distribution $\eta_0$, and a joint policy prior to step $\tau$. The occupancy state can be updated at each step to incorporate the latest decentralized decision rule. That is $\eta_\tau(\overline{s}) = \sum_{s \in S} p(\overline{s} | s, \sigma_{\tau - 1}(s)) \cdot \eta_{\tau - 1} (s)$. The occupancy state is a sufficient statistic for a given system under the control of a sequence of decentralized decision rules $<\sigma_0, ... ,\sigma_{\tau - 1}>$. The difference between an occupancy state and a *belief state* is that a belief state denotes the probability that the system is in state $s$ if the system's history is $h_\tau$ starting in probability distribution $\eta_0$. This means that at the $\tau$-th timestep, all belief states are summarized in a single occupancy state. 
+
+The occupancy state is used in a [different paper](https://www.ijcai.org/Proceedings/13/Papers/024.pdf) to cast a Dec-POMDP to a continuous-state MDP, where the state space consists of all reachable probability distributions over states of the system and histories of the agents (which they term *occupancy states*).

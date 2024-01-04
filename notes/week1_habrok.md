@@ -115,6 +115,7 @@ example:
     scp .ssh/id_ed25519.pub p12345@login1.hb.hpc.rug.nl:desktop_key.pub
 
     rsync -avzp data s3515249@login1.hb.hpc.rug.nl:masterThesis
+    rsync -avzp training_simple_policy/ s3515249@gpu1.hpc.rug.nl:masterThesis
 or 
 
     rsync [options] source destination

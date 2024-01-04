@@ -197,6 +197,44 @@ Here, a comparison is made between RBC, MPC, RLC. Table:
 ![The comparison of RBC, MPC, and RLC](images/control_comparison.PNG)
 
 <u>*Q3: What are different types of RL algorithms and what are their advantages and disadvantages?*</u>
-- Value based
-- Actor-critic
-- Policy gradient
+
+All algorithms share the same objective: learn $\pi_\theta$, parameterized by learnable $\theta$ in a parameter space $\Theta$, where the goal is to search for the *optimal* parameter $\theta^* \in \Theta$ that maximizes the expected total reward:
+
+$$
+    \theta^* = arg max_\theta \mathbb{E}_{\pi_\theta}[\sum_{k=0}^{\infin}\gamma^kr_{t+k}]
+$$
+
+The main categories are:
+
+- model-based / model-free
+
+- model-free:
+  - Value based
+  - Actor-critic
+  - Policy gradient
+
+In model-based RL, an agent focuses on understanding its environment and develops a model of the environment through interacting with it. Model-free RL learns the outcomes of the actions taken through experience.
+
+Value-based algorithms learn the policy inderictly by learning value functions with exploration ($Q(s,a), V(s), A(s,a) (=Q-V)$). These algorithms are only applicable to discrete action spaces.
+
+Policy-based algorithms directly search for an optimal policy by using stochastic estimates of the policy gradients, and are thus applicable to continuous action spaces.
+
+On-policy is often more stable but more sample inefficient than off-policy learning.
+
+<u>*Q7: What are some RL libraries often used?*</u>
+A variety of libraries for RL development are available in Python including Stable-Baselines, Keras-RL, Tensorforce, TFAgents, Coach, and RLLib
+
+<u>*Q9: What are challenges in real-world implementation of RL in the build environment?*</u>
+
+Learning challenges: 
+- Sample inefficiency and intial training instability.
+- State-space complexity.
+- Reward shaping.
+- Delayed feedback.
+- Building-wise tranfer learning difficulty.
+
+<u>*Q10: What are open research questions and possible future research directions?*</u>
+
+Recent advances in physics constrained machine learning (PIML) or physics constrained neural networks (PINNs).
+
+---
