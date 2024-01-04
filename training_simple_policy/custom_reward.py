@@ -28,28 +28,14 @@ class CustomReward(RewardFunction):
     """
     def __init__(self, env_metadata: Mapping[str, Any]):
         super().__init__(env_metadata)
-        # daily peak electricity consumption for this day until the current timestep 
-        # (10 am -> 10 timesteps, 4 pm -> 16 timesteps)
-        # should be reset every day (hour = 0)
-        self.daily_peak = 0.0
-        self.daily_peak_baseline = 0.0
-        # all time peak
-        self.all_time_peak = 0.0
-        # used to calculate average of the day until the current timestep
-        self.total_elec_today = 0.0
-        self.total_elec_today_baseline = 0.0
-        # net elec consumption over grid for current and previous timestep
-        self.grid_net_elec_consumption = 0.0
-        self.prev_grid_net_elec_consumption = 0.0
-        self.grid_net_elec_consumption_baseline = 0.0
-        self.prev_net_elec_consumption_baseline = []
-        self.prev_grid_net_elec_consumption_baseline = 0.0
-        
+        self.reset()
+
     def get_metadata(self):
         return self.env_metadata
 
     def pre_calc_variables(self, observations: List[Mapping[str, Union[int, float]]]):
-        """For efficiency purposes. Variables computed in this function are used multiple times in 
+        """
+        For efficiency purposes. Variables computed in this function are used multiple times in 
         different class methods."""
 
         # grid level total energy consumption
@@ -58,7 +44,7 @@ class CustomReward(RewardFunction):
         self.net_elec_consumption_baseline = []
         for obs in observations:
             if obs["power_outage"]:
-                consumption = 0.0
+                consumption = 0.
             else: 
                 # We base this on demand, as demands are satisfied optimally, either through storage or 
                 # device energy. For the baseline, no storage is available, therefore all demand will 
@@ -84,25 +70,26 @@ class CustomReward(RewardFunction):
         
         # daily peak needs to be reset if it is a new day (hour = [1...24])
         if (observations[0]["hour"] == 1):
-            self.daily_peak = 0.0
-            self.daily_peak_baseline = 0.0
-            self.total_elec_today = 0.0
-            self.total_elec_today_baseline = 0.0
+            self.daily_peak = 0.
+            self.daily_peak_baseline = 0.
+            self.total_elec_today = 0.
+            self.total_elec_today_baseline = 0.
         
         # if a new peak is achieved, we need to know the difference to the last daily peak
         if (self.grid_net_elec_consumption > self.daily_peak):
             self.peak_delta = self.grid_net_elec_consumption - self.daily_peak
             self.daily_peak = self.grid_net_elec_consumption
         else:
-            self.peak_delta = 0.0
+            self.peak_delta = 0.
         if (self.grid_net_elec_consumption_baseline > self.daily_peak_baseline):
             self.peak_delta_baseline = self.grid_net_elec_consumption_baseline - self.daily_peak_baseline
             self.daily_peak_baseline = self.grid_net_elec_consumption_baseline
         else: 
-            self.peak_delta_baseline = 0.0
+            self.peak_delta_baseline = 0.
 
     def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the rewards.
+        """
+        Calculates the rewards.
         
         Parameters
         ----------
@@ -128,18 +115,15 @@ class CustomReward(RewardFunction):
             self.prev_net_elec_consumption_baseline = self.net_elec_consumption_baseline
             
         # the four components of our reward
-        comfort = self.calculateComfort(observations)
-        emissions = self.calculateEmissions(observations)
-        grid = self.calculateGrid(observations)
-        resilience = self.calculateResilience(observations)
-
-        # print("c", comfort)
-        # print("e", emissions)
-        # print("g", grid)
-        # print("r", resilience)
+        # weights based on 2023 citylearn challenge control track score
+        self.comfort = 0.3 * self.calculateComfort(observations)
+        self.emissions = 0.1 * self.calculateEmissions(observations)
+        self.grid = 0.3 * self.calculateGrid(observations)
+        self.resilience = 0.3 * self.calculateResilience(observations)
 
         # weights based on 2023 citylearn challenge control track score
-        reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
+        # reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
+        reward = self.comfort + self.emissions + self.grid + self.resilience
 
         # save this net elec consumption as the previous observation
         self.prev_grid_net_elec_consumption = self.grid_net_elec_consumption
@@ -150,7 +134,8 @@ class CustomReward(RewardFunction):
         return -reward
 
     def calculateComfort(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the comfort component of the reward function. This component of the reward 
+        """
+        Calculates the comfort component of the reward function. This component of the reward 
         function consists of 1 key performance indicator: Unmet thermal comfort (U).
         
         Parameters
@@ -165,12 +150,13 @@ class CustomReward(RewardFunction):
             Comfort reward for transition to the current timestep.
         """
         
-        u = self.unmetThermalComfort(observations)
+        self.u = self.unmetThermalComfort(observations)
 
-        return u
+        return self.u
 
     def calculateEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the emissions component of the reward function. This component of the reward 
+        """
+        Calculates the emissions component of the reward function. This component of the reward 
         function consists of 1 key performance indicator: Carbon emissions (G).
         
         Parameters
@@ -190,7 +176,8 @@ class CustomReward(RewardFunction):
         return g
         
     def calculateGrid(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates all grid-level components of the reward function. This component of the reward 
+        """
+        Calculates all grid-level components of the reward function. This component of the reward 
         function consists of 4 key performance indicator: ramping (R), 1 - load factor (L), daily 
         electricity peak (D), all-time electricity peak (A).
         
@@ -206,20 +193,21 @@ class CustomReward(RewardFunction):
             The average over the 4 KPIs.
         """
 
-        r = self.ramping(observations)
+        self.r = self.ramping(observations)
         # order of dailyPeak() and loadFactor() important!
         #   the daily peak gets updated which is important for the load factor calculation.
-        d = self.dailyPeak(observations)
-        l = self.loadFactor(observations)
-        a = self.allTimePeak(observations)
+        self.d = self.dailyPeak(observations)
+        self.l = self.loadFactor(observations)
+        self.a = self.allTimePeak(observations)
         
         # average
-        reward = (r + d + l + a) / 4
+        reward = (self.r + self.d + self.l + self.a) / 4
 
         return reward
 
     def calculateResilience(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the grid resilience reward. This is based on two key performance indicators.
+        """
+        Calculates the grid resilience reward. This is based on two key performance indicators.
         Namely, thermal resilience (M) and normalized unserved energy (S).
         
         Parameters
@@ -246,7 +234,8 @@ class CustomReward(RewardFunction):
         return reward
 
     def unmetThermalComfort(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the proportion of buildings in the environment that does not meet thermal 
+        """
+        Calculates the proportion of buildings in the environment that does not meet thermal 
         comfort requirements. If no central agent is used, a boolean int list is created where 1
         means thermal comfort not satisfied.
 
@@ -281,7 +270,8 @@ class CustomReward(RewardFunction):
 
     # NOTE: Baseline
     def carbonEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the carbon emissions devided by the baseline emissions. In a centralized 
+        """
+        Calculates the carbon emissions devided by the baseline emissions. In a centralized 
         setting, the sum is calculated. Otherwise, a building wise list is returned.
 
         Parameters
@@ -325,7 +315,8 @@ class CustomReward(RewardFunction):
         return np.array(reward)
         
     def ramping(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Calculates the ramping of electricity consumption from last timestep to the
+        """
+        Calculates the ramping of electricity consumption from last timestep to the
         current over the entire grid.
 
         Parameters
@@ -365,7 +356,8 @@ class CustomReward(RewardFunction):
     
     # NOTE: Baseline
     def loadFactor(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Ratio of daily average and peak consumption. This indicates the efficiency of electricity
+        """
+        Ratio of daily average and peak consumption. This indicates the efficiency of electricity
         consumption. Here, we give the 1 - load factor, as to minimize the reward.
 
         Parameters
@@ -413,7 +405,8 @@ class CustomReward(RewardFunction):
 
     # NOTE: Baseline
     def dailyPeak(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Daily peak as escalated reward.
+        """
+        Daily peak as escalated reward.
 
         Parameters
         ----------
@@ -458,7 +451,8 @@ class CustomReward(RewardFunction):
         return np.array(reward)
 
     def allTimePeak(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """All-time peak as escalated reward.
+        """
+        All-time peak as escalated reward.
 
         Parameters
         ----------
@@ -504,7 +498,8 @@ class CustomReward(RewardFunction):
         return np.array(reward)
     
     def thermalResilience(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Thermal resilience. Same as unmetThermalComfort but with the constraint that there has 
+        """
+        Thermal resilience. Same as unmetThermalComfort but with the constraint that there has 
         to be a power outage.
 
         Parameters
@@ -540,7 +535,8 @@ class CustomReward(RewardFunction):
         return np.array(reward)
 
     def normalizedUnservedEnergy(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Proportion of unmet demand due to supply shortage in a power outage.
+        """
+        Proportion of unmet demand due to supply shortage in a power outage.
 
         Parameters
         ----------
@@ -615,7 +611,8 @@ class CustomReward(RewardFunction):
         return np.array(reward)
 
     def unservedEnergyAlternative(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
-        """Alternative to unmet demand due to power outage. This reward is a simplified rough estimation 
+        """
+        Alternative to unmet demand due to power outage. This reward is a simplified rough estimation 
         of the unmet demand by just using the current demand if there is a power outage. 
         
         This can be seen as a rough estimate, as when demands can not be met, the following demands will
@@ -657,14 +654,35 @@ class CustomReward(RewardFunction):
 
 
     def reset(self):
-        """Used to reset variables at the start of an episode."""
-
-        self.daily_peak = 0.0
-        self.all_time_peak = 0.0
-        self.total_elec_today = 0.0
-        self.total_elec_today_baseline = 0.0
-        self.grid_net_elec_consumption = 0.0
-        self.prev_grid_net_elec_consumption = 0.0
-        self.grid_net_elec_consumption_baseline = 0.0
+        """
+        Used to reset variables at the start of an episode.
+        """
+        # daily peak electricity consumption for this day until the current timestep 
+        # (10 am -> 10 timesteps, 4 pm -> 16 timesteps)
+        # should be reset every day (hour = 0)
+        self.daily_peak = 0.
+        self.daily_peak_baseline = 0.
+        # all time peak
+        self.all_time_peak = 0.
+        # used to calculate average of the day until the current timestep
+        self.total_elec_today = 0.
+        self.total_elec_today_baseline = 0.
+        # net elec consumption over grid for current and previous timestep
+        self.grid_net_elec_consumption = 0.
+        self.prev_grid_net_elec_consumption = 0.
+        self.grid_net_elec_consumption_baseline = 0.
         self.prev_net_elec_consumption_baseline = []
-        self.prev_grid_net_elec_consumption_baseline = 0.0
+        self.prev_grid_net_elec_consumption_baseline = 0.
+        # to access KPIs for tensorboard plots
+        self.comfort = 0.
+        self.emissions = 0.
+        self.grid = 0.
+        self.resilience = 0.
+        self.u = 0.
+        self.g = 0.
+        self.r = 0.
+        self.d = 0.
+        self.l = 0.
+        self.a = 0.
+        self.m = 0.
+        self.s = 0.
