@@ -87,7 +87,6 @@ class CustomReward(RewardFunction):
         else: 
             self.peak_delta_baseline = 0.
 
-
     def calculate(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
         """
         Calculates the rewards.
@@ -117,19 +116,14 @@ class CustomReward(RewardFunction):
             
         # the four components of our reward
         # weights based on 2023 citylearn challenge control track score
-        comfort = 0.3 * self.calculateComfort(observations)
-        emissions = 0.1 * self.calculateEmissions(observations)
-        grid = 0.3 * self.calculateGrid(observations)
-        resilience = 0.3 * self.calculateResilience(observations)
+        self.comfort = 0.3 * self.calculateComfort(observations)
+        self.emissions = 0.1 * self.calculateEmissions(observations)
+        self.grid = 0.3 * self.calculateGrid(observations)
+        self.resilience = 0.3 * self.calculateResilience(observations)
 
         # weights based on 2023 citylearn challenge control track score
-        reward = comfort + emissions + grid + resilience
-
-        # add to sum for tracking in stablebaselines
-        self.comfort += comfort
-        self.emissions += emissions
-        self.grid += grid
-        self.resilience += resilience
+        # reward = 0.3 * comfort + 0.1 * emissions + 0.3 * grid + 0.3 * resilience
+        reward = self.comfort + self.emissions + self.grid + self.resilience
 
         # save this net elec consumption as the previous observation
         self.prev_grid_net_elec_consumption = self.grid_net_elec_consumption
@@ -156,12 +150,9 @@ class CustomReward(RewardFunction):
             Comfort reward for transition to the current timestep.
         """
         
-        u = self.unmetThermalComfort(observations)
+        self.u = self.unmetThermalComfort(observations)
 
-        # add to sum for tracking
-        self.u += u
-
-        return u
+        return self.u
 
     def calculateEmissions(self, observations: List[Mapping[str, Union[int, float]]]) -> np.ndarray[Any, np.dtype[np.float64]]:
         """
@@ -181,9 +172,6 @@ class CustomReward(RewardFunction):
         """
 
         g = self.carbonEmissions(observations)
-
-        # add to sum for tracking
-        self.g += g
         
         return g
         
@@ -205,19 +193,15 @@ class CustomReward(RewardFunction):
             The average over the 4 KPIs.
         """
 
-        r = self.ramping(observations)
-        d = self.dailyPeak(observations)
-        l = self.loadFactor(observations)
-        a = self.allTimePeak(observations)
+        self.r = self.ramping(observations)
+        # order of dailyPeak() and loadFactor() important!
+        #   the daily peak gets updated which is important for the load factor calculation.
+        self.d = self.dailyPeak(observations)
+        self.l = self.loadFactor(observations)
+        self.a = self.allTimePeak(observations)
         
         # average
-        reward = (r + d + l + a) / 4
-
-        # add to sum for tracking
-        self.r += r
-        self.d += d
-        self.l += l
-        self.a += a
+        reward = (self.r + self.d + self.l + self.a) / 4
 
         return reward
 
@@ -246,10 +230,6 @@ class CustomReward(RewardFunction):
 
         # average over KPIs
         reward = (m + s) / 2
-
-        # add to sum for tracking
-        self.m += m
-        self.s += s
 
         return reward
 
@@ -317,13 +297,15 @@ class CustomReward(RewardFunction):
                         
         # devision by 0.0 check
         if (emissions_baseline < 0.001):
-            reward = 0.
+            reward = 0.0
         else: 
             reward = emissions / emissions_baseline
             
+        
+            
         if (math.isnan(reward) or math.isinf(reward)):
             print("Carbon emissions")
-            reward = 0.
+            reward = 0.0
                         
         if self.central_agent:
             reward = [reward]
@@ -404,14 +386,14 @@ class CustomReward(RewardFunction):
   
         # zero devision check
         if (load_factor_baseline < 0.01):
-            reward = 0.
+            reward = 0.0
         else:
             # normalize
             reward = load_factor / load_factor_baseline
 
         if (math.isnan(reward) or math.isinf(reward)):
             print("Load factor")
-            reward = 0.
+            reward = 0.0
 
         if self.central_agent:
             reward = [reward]
@@ -439,6 +421,11 @@ class CustomReward(RewardFunction):
             and the current consumption if it is higher. 
         """
 
+        # Score calculation = average over all days
+        #   therefore, to reflect the score calculation in this reward
+        #   the reward should be devided by the number of days in the 
+        #   simulation. We can see the number of days in the metadata.
+        
         # zero devision check
         if (self.peak_delta_baseline < 0.01):
             reward = 0.0
@@ -481,34 +468,27 @@ class CustomReward(RewardFunction):
         """
         
         delta = 0.0
-        # delta_baseline = 0.0
+        delta_baseline = 0.0
         
         # new peak consumption
         if (self.grid_net_elec_consumption > self.all_time_peak):
-            # reward is difference 
-            delta = self.grid_net_elec_consumption - self.all_time_peak
             # set new peak
             self.all_time_peak = self.grid_net_elec_consumption
+            # reward is difference 
+            delta = self.grid_net_elec_consumption - self.daily_peak
             
         # baseline
-        # print(self.grid_net_elec_consumption, self.grid_net_elec_consumption_baseline)
-        # if (self.grid_net_elec_consumption_baseline > self.all_time_peak):
-        #     delta_baseline = self.grid_net_elec_consumption_baseline - self.all_time_peak
+        if (self.grid_net_elec_consumption_baseline > self.all_time_peak):
+            delta_baseline = self.grid_net_elec_consumption_baseline - self.all_time_peak
             
-        # baseline is calculated using the value of the baseline consumption ontop of the current delta
-        # delta_baseline = delta + self.grid_net_elec_consumption_baseline
-    
         # zero devision check
-        # if (delta_baseline < 0.001):
-            # reward = 0.
-        # else:
-            # reward = delta / delta_baseline   
-
-        reward = delta
-
-        # if (math.isnan(reward) or math.isinf(reward)):
-        #     print("All-time peak")
-        #     reward = 0.
+        if (delta_baseline < 0.001):
+            reward = 0.0
+        else:
+            reward = delta / delta_baseline   
+            
+        if (math.isnan(reward) or math.isinf(reward)):
+            print("All-time peak")
 
         if self.central_agent:
             reward = [reward]
@@ -570,6 +550,9 @@ class CustomReward(RewardFunction):
             Ratio of served energy to the total energy demand when in a power outage.
         """
         
+        # power outage status per building
+        power = [obs["power_outage"] for obs in observations]
+
         reward_list = []
         for obs in observations:
             # current building power outage
@@ -609,16 +592,16 @@ class CustomReward(RewardFunction):
 
                 # reward is 1 minus ratio between realized and unserved energy demands.
                 # NOTE: different from the docs, there they just take the ratio
-                ratio = 1 - (served / expected)
+                reward = 1 - (served / expected)
 
             # no power outage
             else:
-                ratio = 0.
+                reward = 0.0
                 
-            if (math.isnan(ratio) or math.isinf(ratio)):
+            if (math.isnan(reward) or math.isinf(reward)):
                 print("Unserved")
                 
-            reward_list.append(ratio)
+            reward_list.append(reward)
         
         if self.central_agent:
             reward = [sum(reward_list) / len(reward_list)]
@@ -669,6 +652,7 @@ class CustomReward(RewardFunction):
 
         return np.array(reward)
 
+
     def reset(self):
         """
         Used to reset variables at the start of an episode.
@@ -690,15 +674,15 @@ class CustomReward(RewardFunction):
         self.prev_net_elec_consumption_baseline = []
         self.prev_grid_net_elec_consumption_baseline = 0.
         # to access KPIs for tensorboard plots
-        self.comfort = [0.]
-        self.emissions = [0.]
-        self.grid = [0.]
-        self.resilience = [0.]
-        self.u = [0.]
-        self.g = [0.]
-        self.r = [0.]
-        self.d = [0.]
-        self.l = [0.]
-        self.a = [0.]
-        self.m = [0.]
-        self.s = [0.]
+        self.comfort = 0.
+        self.emissions = 0.
+        self.grid = 0.
+        self.resilience = 0.
+        self.u = 0.
+        self.g = 0.
+        self.r = 0.
+        self.d = 0.
+        self.l = 0.
+        self.a = 0.
+        self.m = 0.
+        self.s = 0.
