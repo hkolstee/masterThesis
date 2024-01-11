@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --time=44:00:00
+#SBATCH --time=40:00:00
 #SBATCH --job-name=citylearn_simple_policy_test
 #SBATCH --partition=gpu
-#SBATCH --gpus-per-node=1
-#SBATCH --mem=16000
+#SBATCH --gpus-per-node=a100.20gb:1
+#SBATCH --mem=20000
 #SBATCH --cpus-per-task=1
 
 module purge
