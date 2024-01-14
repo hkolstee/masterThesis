@@ -58,3 +58,46 @@ The following have been reloaded with a version change:
 2024-01-12 23:39:31.377899: I tensorflow/core/util/port.cc:104] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
 /home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/core.py:311: UserWarning: [33mWARN: env.reward_function to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.reward_function` for environment variables or `env.get_wrapper_attr('reward_function')` that will search the reminding wrappers.[0m
   logger.warn(
+Load factor
+Load factor
+Done
+
+###############################################################################
+Hábrók Cluster
+Job 6829030 for user s3515249
+Finished at: Sun Jan 14 10:01:47 CET 2024
+
+Job details:
+============
+
+Job ID              : 6829030
+Name                : citylearn_simple_policy_test
+User                : s3515249
+Partition           : gpulong
+Nodes               : a100gpu1
+Number of Nodes     : 1
+Cores               : 1
+Number of Tasks     : 1
+State               : COMPLETED
+Submit              : 2024-01-12T18:42:13
+Start               : 2024-01-12T23:38:50
+End                 : 2024-01-14T10:01:47
+Reserved walltime   : 2-00:00:00
+Used walltime       : 1-10:22:57
+Used CPU time       : 1-10:11:01 (efficiency: 99.42%)
+% User (Computation): 99.05%
+% System (I/O)      :  0.95%
+Mem reserved        : 20000M
+Max Mem (Node/step) : 18.09G (a100gpu1, per node)
+Full Max Mem usage  : 18.09G
+Total Disk Read     : 4.41G
+Total Disk Write    : 10.00M
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################

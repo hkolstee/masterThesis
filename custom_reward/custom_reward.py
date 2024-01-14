@@ -3,11 +3,6 @@ from citylearn.reward_function import RewardFunction
 
 import numpy as np
 import math
-# from KPI_calculation_util import *
-
-###################################################################
-#####                Specify your reward here                 #####
-###################################################################
 
 # NOTE: All but U, M, and S KPIs are normalized by their baseline value 
 # where the baseline is the result from when none of the distributed 
