@@ -305,11 +305,16 @@ class CustomReward(RewardFunction):
         for idx, obs in enumerate(observations):
             # emission
             emissions += max(0, obs["net_electricity_consumption"] * obs["carbon_intensity"]) 
+
+                    # NOTE: net_electricity consumption is calculated by taking sum of all storage
+                    #   charging (positive), discharing (negative, battery only), and 
+                    #   heating/cooling/dhw device electricity consumption. From this, the solar 
+                    #   generation is subtracted.
             
             # baseline                
             emissions_baseline += max(0, self.net_elec_consumption_baseline[idx] * obs["carbon_intensity"])
                         
-        # devision by 0.0 check
+        # devision by 0 check
         if (emissions_baseline < 0.001):
             reward = 0.
         else: 

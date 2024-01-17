@@ -6,3 +6,5 @@ numpy
 pandas
 gast==0.4.0
 protobuf==3.19
+tensorboard>=2.3
+tbparse
