@@ -150,3 +150,36 @@ $$
 $$
 
 to be continued...
+
+---
+
+### Hyperparameters in RL
+
+PAPER: [Hyperparameters in Reinforcement Learning and How To Tune Them](https://arxiv.org/abs/2306.01324)
+
+ABSTRACT: In order to improve reproducibility, deep reinforcement learning (RL) has been adopting better scientific practices such as standardized evaluation metrics and reporting. However, the process of hyperparameter optimization still varies widely across papers, which makes it challenging to compare RL algorithms fairly. In this paper, we show that hyperparameter choices in RL can significantly affect the agent’s final performance and sample efficiency, and that the hyperparameter landscape can strongly depend on the tuning seed which may lead to overfitting. We therefore propose adopting established best practices from AutoML, such as the separation of tuning and testing seeds, as well as principled hyperparameter optimization (HPO) across a broad search space. We support this by comparing multiple state-of-theart HPO tools on a range of RL algorithms and environments to their hand-tuned counterparts, demonstrating that HPO approaches often have higher performance and lower compute overhead. As a result of our findings, we recommend a set of best practices for the RL community, which should result in stronger empirical results with fewer computational costs, better reproducibility, and thus faster progress. In order to encourage the adoption of these practices, we provide plug-andplay implementations of the tuning algorithms used in this paper at https://github.com/facebookresearch/how-to-autorl.
+
+
+
+---
+
+### Hyperparameters in SAC
+
+
+---
+
+### Multi-agent Soft Actor-Critic
+
+[Decomposed Soft Actor-Critic Method for Cooperative Multi-Agent Reinforcement Learning](https://arxiv.org/abs/2104.06655)
+
+---
+
+### CTDE
+
+[Is Centralized Training with Decentralized Execution Framework Centralized Enough for MARL?](https://arxiv.org/abs/2305.17352)
+
+---
+
+### OVERALL SURVEY VERY COMPLETE AND GOOD
+
+[Multi-agent deep reinforcement learning: a survey](https://link.springer.com/article/10.1007/s10462-021-09996-w)
