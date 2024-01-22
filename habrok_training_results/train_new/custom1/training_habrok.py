@@ -7,7 +7,7 @@ import math
 import sys
 import os
 
-import gym
+import gymnasium as gym
 
 from citylearn.citylearn import CityLearnEnv
 from citylearn.wrappers import NormalizedObservationWrapper, StableBaselines3Wrapper
@@ -15,6 +15,7 @@ from citylearn.wrappers import NormalizedObservationWrapper, StableBaselines3Wra
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, CallbackList
 from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.monitor import Monitor
 
 from custom_reward import CustomReward
 
@@ -39,8 +40,10 @@ class CustomCallback(BaseCallback):
         self.logger.record("thermal resilience (m)", -self.training_env.get_attr("reward_function")[0].m[0])
         self.logger.record("normalized unserved energy (s)", -self.training_env.get_attr("reward_function")[0].s[0])
 
+
     def _on_step(self) -> bool:
-        return True
+        return True        
+
 
 def main():
     # schema path
@@ -55,6 +58,8 @@ def main():
     env = StableBaselines3Wrapper(env)
     eval_env = NormalizedObservationWrapper(eval_env)
     eval_env = StableBaselines3Wrapper(eval_env)
+    # monitor wrapper because otherwise messed up tensorboard values
+    # eval_env = Monitor(eval_env)
 
     # create callbacklist
     custom_logging_callback = CustomCallback()
@@ -62,7 +67,7 @@ def main():
                                  best_model_save_path = "models/",
                                  log_path = "logs/",
                                  eval_freq = 720 * 3)
-    callback_list = CallbackList([eval_callback, custom_logging_callback])
+    callback_list = CallbackList([custom_logging_callback, eval_callback])
     
     # create SAC model
     model = SAC("MlpPolicy", env, tensorboard_log="./tensorboard_logs/", device = "cuda")

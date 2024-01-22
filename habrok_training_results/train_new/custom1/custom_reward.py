@@ -37,6 +37,7 @@ class CustomReward(RewardFunction):
         """
         For efficiency purposes. Variables computed in this function are used multiple times in 
         different class methods."""
+        self.step += 1
 
         # grid level total energy consumption
         self.grid_net_elec_consumption = sum([obs["net_electricity_consumption"] for obs in observations])
@@ -701,3 +702,4 @@ class CustomReward(RewardFunction):
         self.a = [0.]
         self.m = [0.]
         self.s = [0.]
+        self.step = 0
