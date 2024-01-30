@@ -14,17 +14,17 @@ class Critic(MultiLayerPerceptron):
 
     Args:
         lr (float): Learning rate
-        obs_dim (int): Observation dimensions
-        action_dom (int): Actions dimensions
+        obs_size (int): Observation size
+        action_size (int): Actions size
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_dim, actions_dim, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, actions_size, layer_sizes = (256, 256)):
         super().__init__(lr = lr,
-                         input_dim = obs_dim + actions_dim, 
-                         output_dim = 1, 
+                         input_size = obs_size + actions_size, 
+                         output_size = 1, 
                          layer_sizes = layer_sizes)
         
     def forward(self, obs, action):
-        out = super().forward(torch.cat([obs, action], dim = 1))
-        
-        return out[0]
+        out = super().forward(torch.cat([obs, action], dim = -1).float())[0]
+                
+        return out.squeeze(-1)

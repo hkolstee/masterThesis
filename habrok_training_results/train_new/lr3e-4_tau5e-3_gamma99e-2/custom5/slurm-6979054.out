@@ -1,0 +1,612 @@
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) 2023.01   2) StdEnv
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.2.0 => GCCcore/11.3.0
+  2) GMP/6.2.1-GCCcore-12.2.0 => GMP/6.2.1-GCCcore-11.3.0
+  3) Python/3.10.8-GCCcore-12.2.0 => Python/3.10.4-GCCcore-11.3.0
+  4) SQLite/3.39.4-GCCcore-12.2.0 => SQLite/3.38.3-GCCcore-11.3.0
+  5) Tcl/8.6.12-GCCcore-12.2.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.2.7-GCCcore-12.2.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.39-GCCcore-12.2.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.2.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.2.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.2.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.3-GCCcore-12.2.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) zlib/1.2.12-GCCcore-12.2.0 => zlib/1.2.12-GCCcore-11.3.0
+
+
+The following have been reloaded with a version change:
+  1) FFTW/3.3.10-GCC-11.3.0 => FFTW/3.3.10-GCC-12.3.0
+  2) FlexiBLAS/3.2.0-GCC-11.3.0 => FlexiBLAS/3.3.1-GCC-12.3.0
+  3) GCC/11.3.0 => GCC/12.3.0
+  4) GCCcore/11.3.0 => GCCcore/12.3.0
+  5) OpenBLAS/0.3.20-GCC-11.3.0 => OpenBLAS/0.3.23-GCC-12.3.0
+  6) Python/3.10.4-GCCcore-11.3.0 => Python/3.11.3-GCCcore-12.3.0
+  7) SQLite/3.38.3-GCCcore-11.3.0 => SQLite/3.42.0-GCCcore-12.3.0
+  8) SciPy-bundle/2022.05-foss-2022a => SciPy-bundle/2023.07-gfbf-2023a
+  9) Tcl/8.6.12-GCCcore-11.3.0 => Tcl/8.6.13-GCCcore-12.3.0
+ 10) XZ/5.2.5-GCCcore-11.3.0 => XZ/5.4.2-GCCcore-12.3.0
+ 11) binutils/2.38-GCCcore-11.3.0 => binutils/2.40-GCCcore-12.3.0
+ 12) bzip2/1.0.8-GCCcore-11.3.0 => bzip2/1.0.8-GCCcore-12.3.0
+ 13) libffi/3.4.2-GCCcore-11.3.0 => libffi/3.4.4-GCCcore-12.3.0
+ 14) libreadline/8.1.2-GCCcore-11.3.0 => libreadline/8.2-GCCcore-12.3.0
+ 15) ncurses/6.3-GCCcore-11.3.0 => ncurses/6.4-GCCcore-12.3.0
+ 16) pybind11/2.9.2-GCCcore-11.3.0 => pybind11/2.11.1-GCCcore-12.3.0
+ 17) zlib/1.2.12-GCCcore-11.3.0 => zlib/1.2.13-GCCcore-12.3.0
+
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.3.0 => GCCcore/11.3.0
+  2) Python/3.11.3-GCCcore-12.3.0 => Python/3.10.4-GCCcore-11.3.0
+  3) SQLite/3.42.0-GCCcore-12.3.0 => SQLite/3.38.3-GCCcore-11.3.0
+  4) SciPy-bundle/2023.07-gfbf-2023a => SciPy-bundle/2022.05-foss-2022a
+  5) Tcl/8.6.13-GCCcore-12.3.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.4.2-GCCcore-12.3.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.40-GCCcore-12.3.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.3.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.3.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.3.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.4-GCCcore-12.3.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) pybind11/2.11.1-GCCcore-12.3.0 => pybind11/2.9.2-GCCcore-11.3.0
+ 13) zlib/1.2.13-GCCcore-12.3.0 => zlib/1.2.12-GCCcore-11.3.0
+
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/stable_baselines3/common/vec_env/patch_gym.py:49: UserWarning: You provided an OpenAI Gym environment. We strongly recommend transitioning to Gymnasium environments. Stable-Baselines3 is automatically wrapping your environments in a compatibility layer, which could potentially cause issues.
+  warnings.warn(
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/core.py:311: UserWarning: [33mWARN: env.reward_function to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.reward_function` for environment variables or `env.get_wrapper_attr('reward_function')` that will search the reminding wrappers.[0m
+  logger.warn(
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/stable_baselines3/common/evaluation.py:67: UserWarning: Evaluation environment is not wrapped with a ``Monitor`` wrapper. This may result in reporting modified episode lengths and rewards, if other wrappers happen to modify these. Consider wrapping environment first with ``Monitor`` wrapper.
+  warnings.warn(
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/core.py:311: UserWarning: [33mWARN: env.reward_function to get variables from other wrappers is deprecated and will be removed in v1.0, to get this variable you can do `env.unwrapped.reward_function` for environment variables or `env.get_wrapper_attr('reward_function')` that will search the reminding wrappers.[0m
+  logger.warn(
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/stable_baselines3/common/evaluation.py:67: UserWarning: Evaluation environment is not wrapped with a ``Monitor`` wrapper. This may result in reporting modified episode lengths and rewards, if other wrappers happen to modify these. Consider wrapping environment first with ``Monitor`` wrapper.
+  warnings.warn(
+Eval num_timesteps=18000, episode_reward=-464.36 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=36000, episode_reward=-569.47 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=54000, episode_reward=-413.84 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=72000, episode_reward=-547.69 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=90000, episode_reward=-438.09 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=108000, episode_reward=-401.92 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=126000, episode_reward=-379.31 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=144000, episode_reward=-388.10 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=162000, episode_reward=-380.77 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=180000, episode_reward=-343.13 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=198000, episode_reward=-343.27 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=216000, episode_reward=-331.57 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Load factor
+Eval num_timesteps=234000, episode_reward=-304.42 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=252000, episode_reward=-322.96 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=270000, episode_reward=-322.86 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=288000, episode_reward=-302.61 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=306000, episode_reward=-295.90 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=324000, episode_reward=-281.00 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=342000, episode_reward=-278.26 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=360000, episode_reward=-268.43 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=378000, episode_reward=-280.59 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=396000, episode_reward=-262.62 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=414000, episode_reward=-278.70 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=432000, episode_reward=-276.54 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=450000, episode_reward=-266.31 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=468000, episode_reward=-265.01 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=486000, episode_reward=-248.42 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=504000, episode_reward=-244.95 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=522000, episode_reward=-267.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=540000, episode_reward=-269.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=558000, episode_reward=-244.96 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=576000, episode_reward=-244.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=594000, episode_reward=-246.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=612000, episode_reward=-238.06 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=630000, episode_reward=-237.31 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=648000, episode_reward=-228.30 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=666000, episode_reward=-229.71 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=684000, episode_reward=-220.98 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Load factor
+Eval num_timesteps=702000, episode_reward=-219.26 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=720000, episode_reward=-211.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=738000, episode_reward=-217.39 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=756000, episode_reward=-220.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=774000, episode_reward=-218.02 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=792000, episode_reward=-214.00 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=810000, episode_reward=-207.74 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=828000, episode_reward=-217.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=846000, episode_reward=-202.41 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=864000, episode_reward=-211.86 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=882000, episode_reward=-208.41 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=900000, episode_reward=-195.98 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=918000, episode_reward=-189.54 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=936000, episode_reward=-204.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Load factor
+Eval num_timesteps=954000, episode_reward=-188.11 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=972000, episode_reward=-196.88 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=990000, episode_reward=-190.03 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1008000, episode_reward=-179.90 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1026000, episode_reward=-179.55 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Load factor
+Eval num_timesteps=1044000, episode_reward=-177.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Load factor
+Eval num_timesteps=1062000, episode_reward=-175.09 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1080000, episode_reward=-164.70 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1098000, episode_reward=-167.72 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1116000, episode_reward=-171.43 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1134000, episode_reward=-167.03 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1152000, episode_reward=-157.19 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1170000, episode_reward=-154.58 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1188000, episode_reward=-153.79 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1206000, episode_reward=-153.70 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1224000, episode_reward=-149.63 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1242000, episode_reward=-145.03 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1260000, episode_reward=-147.37 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1278000, episode_reward=-147.55 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1296000, episode_reward=-143.11 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1314000, episode_reward=-138.99 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1332000, episode_reward=-141.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1350000, episode_reward=-132.92 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1368000, episode_reward=-141.26 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1386000, episode_reward=-135.90 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1404000, episode_reward=-135.21 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1422000, episode_reward=-134.97 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1440000, episode_reward=-131.97 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1458000, episode_reward=-132.88 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1476000, episode_reward=-130.72 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1494000, episode_reward=-126.74 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1512000, episode_reward=-125.59 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1530000, episode_reward=-124.25 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1548000, episode_reward=-121.33 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1566000, episode_reward=-123.98 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1584000, episode_reward=-120.57 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1602000, episode_reward=-121.70 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1620000, episode_reward=-119.60 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1638000, episode_reward=-120.01 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1656000, episode_reward=-118.16 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1674000, episode_reward=-121.38 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1692000, episode_reward=-116.41 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1710000, episode_reward=-117.26 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1728000, episode_reward=-115.50 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1746000, episode_reward=-116.22 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1764000, episode_reward=-113.72 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1782000, episode_reward=-110.28 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1800000, episode_reward=-112.45 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1818000, episode_reward=-111.95 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1836000, episode_reward=-111.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1854000, episode_reward=-110.48 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1872000, episode_reward=-108.94 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1890000, episode_reward=-106.94 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1908000, episode_reward=-108.42 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1926000, episode_reward=-110.56 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1944000, episode_reward=-105.46 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1962000, episode_reward=-105.15 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=1980000, episode_reward=-107.19 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=1998000, episode_reward=-105.05 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2016000, episode_reward=-105.37 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2034000, episode_reward=-103.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2052000, episode_reward=-106.26 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2070000, episode_reward=-107.64 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2088000, episode_reward=-101.87 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2106000, episode_reward=-104.24 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2124000, episode_reward=-103.01 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2142000, episode_reward=-106.10 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2160000, episode_reward=-109.94 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2178000, episode_reward=-104.82 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2196000, episode_reward=-100.67 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2214000, episode_reward=-100.12 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2232000, episode_reward=-100.57 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2250000, episode_reward=-99.53 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2268000, episode_reward=-99.41 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2286000, episode_reward=-106.72 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2304000, episode_reward=-100.23 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2322000, episode_reward=-97.23 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2340000, episode_reward=-96.91 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2358000, episode_reward=-95.32 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2376000, episode_reward=-97.28 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2394000, episode_reward=-95.22 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2412000, episode_reward=-96.99 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2430000, episode_reward=-98.92 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2448000, episode_reward=-100.73 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2466000, episode_reward=-94.96 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2484000, episode_reward=-100.29 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2502000, episode_reward=-107.14 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2520000, episode_reward=-98.58 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2538000, episode_reward=-105.47 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2556000, episode_reward=-96.80 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2574000, episode_reward=-97.18 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2592000, episode_reward=-96.54 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2610000, episode_reward=-96.46 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2628000, episode_reward=-99.02 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2646000, episode_reward=-94.43 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2664000, episode_reward=-94.00 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2682000, episode_reward=-97.44 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2700000, episode_reward=-93.29 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2718000, episode_reward=-92.66 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2736000, episode_reward=-103.33 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2754000, episode_reward=-109.05 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2772000, episode_reward=-107.73 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2790000, episode_reward=-100.15 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2808000, episode_reward=-100.56 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2826000, episode_reward=-99.07 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2844000, episode_reward=-99.30 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2862000, episode_reward=-96.73 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2880000, episode_reward=-97.33 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2898000, episode_reward=-98.06 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2916000, episode_reward=-94.75 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2934000, episode_reward=-96.65 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2952000, episode_reward=-94.34 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=2970000, episode_reward=-91.43 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=2988000, episode_reward=-90.25 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3006000, episode_reward=-93.04 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3024000, episode_reward=-93.34 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3042000, episode_reward=-93.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3060000, episode_reward=-91.49 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3078000, episode_reward=-90.62 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3096000, episode_reward=-93.86 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3114000, episode_reward=-91.15 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3132000, episode_reward=-93.70 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3150000, episode_reward=-91.13 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3168000, episode_reward=-90.80 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3186000, episode_reward=-92.74 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3204000, episode_reward=-94.96 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3222000, episode_reward=-90.05 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3240000, episode_reward=-96.16 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3258000, episode_reward=-97.30 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3276000, episode_reward=-90.50 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3294000, episode_reward=-88.49 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3312000, episode_reward=-91.29 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3330000, episode_reward=-90.95 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3348000, episode_reward=-93.52 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3366000, episode_reward=-88.08 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3384000, episode_reward=-91.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3402000, episode_reward=-87.91 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3420000, episode_reward=-87.64 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3438000, episode_reward=-89.73 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3456000, episode_reward=-88.92 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3474000, episode_reward=-89.65 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3492000, episode_reward=-87.38 +/- 0.00
+Episode length: 719.00 +/- 0.00
+New best mean reward!
+Eval num_timesteps=3510000, episode_reward=-88.72 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3528000, episode_reward=-87.77 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3546000, episode_reward=-87.97 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3564000, episode_reward=-92.87 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3582000, episode_reward=-94.88 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3600000, episode_reward=-94.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3618000, episode_reward=-94.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3636000, episode_reward=-95.06 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3654000, episode_reward=-90.77 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3672000, episode_reward=-93.09 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3690000, episode_reward=-92.85 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3708000, episode_reward=-92.07 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3726000, episode_reward=-90.28 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3744000, episode_reward=-90.57 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3762000, episode_reward=-93.73 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3780000, episode_reward=-90.93 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3798000, episode_reward=-89.97 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3816000, episode_reward=-89.43 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3834000, episode_reward=-92.34 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3852000, episode_reward=-90.21 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3870000, episode_reward=-88.93 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3888000, episode_reward=-89.38 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3906000, episode_reward=-94.51 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3924000, episode_reward=-91.27 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3942000, episode_reward=-89.35 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Eval num_timesteps=3960000, episode_reward=-90.42 +/- 0.00
+Episode length: 719.00 +/- 0.00
+Done
+
+###############################################################################
+Hábrók Cluster
+Job 6979054 for user s3515249
+Finished at: Sat Jan 27 17:49:46 CET 2024
+
+Job details:
+============
+
+
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################
