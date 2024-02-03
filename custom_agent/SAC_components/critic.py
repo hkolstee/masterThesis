@@ -1,4 +1,5 @@
 import os
+import sys
 
 import numpy as np
 
@@ -6,6 +7,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 import torch.optim as optim
+
+# add folder to python path for relative imports
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+sys.path.append(dname)
 
 from MLP import MultiLayerPerceptron
 

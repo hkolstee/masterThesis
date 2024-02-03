@@ -168,10 +168,6 @@
       "active": true,
       "shared_in_central_agent": false
     },
-    "indoor_dry_bulb_temperature_without_control": {
-      "active": true,
-      "shared_in_central_agent": false
-    },
     "cooling_demand_without_control": {
       "active": true,
       "shared_in_central_agent": false
@@ -180,28 +176,24 @@
       "active": true,
       "shared_in_central_agent": false
     },
-    "dhw_demand_without_control": {
-      "active": true,
-      "shared_in_central_agent": false
-    },
     "non_shiftable_load_without_control": {
       "active": true,
       "shared_in_central_agent": false
     },
-    "cooling_storage_electricity_consumption": {
+    "dhw_demand_without_control": {
       "active": true,
       "shared_in_central_agent": false
     },
-    "heating_storage_electricity_consumption": {
-      "active": true,
+    "cooling_electricity_consumption": {
+      "active": false,
       "shared_in_central_agent": false
     },
-    "dhw_storage_electricity_consumption": {
-      "active": true,
+    "heating_electricity_consumption": {
+      "active": false,
       "shared_in_central_agent": false
     },
-    "electrical_storage_electricity_consumption": {
-      "active": true,
+    "dhw_electricity_consumption": {
+      "active": false,
       "shared_in_central_agent": false
     },
     "occupant_count": {
@@ -262,7 +254,7 @@
     }
   },
   "reward_function": {
-    "type": "RewardFunction",
+    "type": "citylearn.reward_function.ComfortReward",
     "attributes": {
       "band": 1.0,
       "lower_exponent": 2.0,
@@ -281,7 +273,7 @@
       "inactive_actions": [],
       "cooling_device": {
         "type": "citylearn.energy_model.HeatPump",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },
@@ -294,7 +286,7 @@
       },
       "dhw_device": {
         "type": "citylearn.energy_model.ElectricHeater",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },
@@ -491,7 +483,7 @@
       "inactive_actions": [],
       "cooling_device": {
         "type": "citylearn.energy_model.HeatPump",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },
@@ -504,7 +496,7 @@
       },
       "dhw_device": {
         "type": "citylearn.energy_model.ElectricHeater",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },
@@ -701,7 +693,7 @@
       "inactive_actions": [],
       "cooling_device": {
         "type": "citylearn.energy_model.HeatPump",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },
@@ -714,7 +706,7 @@
       },
       "dhw_device": {
         "type": "citylearn.energy_model.ElectricHeater",
-        "autosize": true,
+        "autosize": false,
         "autosize_attributes": {
           "safety_factor": 1.0
         },

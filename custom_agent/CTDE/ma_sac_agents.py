@@ -13,13 +13,9 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-# import replay_buffer
-# import critic
-# import actor
-
-from ma_replay_buffer import MultiAgentReplayBuffer
-from critic import Critic
-from actor import Actor
+from ..SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
+from ..SAC_components.critic import Critic
+from ..SAC_components.actor import Actor
 
 from copy import deepcopy
 
@@ -69,7 +65,7 @@ class Agents:
         # one local actor per agent, gets local observations only
         self.actors = nn.ModuleList()
         for (obs_space, act_space) in zip(self.env.observation_space, self.env.action_space):
-            self.actors.append(Actor(lr_actor, obs_space.shape[0], act_space.shape[0], act_space.high[0], layer_sizes))
+            self.actors.append(Actor(lr_actor, obs_space.shape[0], act_space.shape[0], act_space.low, act_space.high, layer_sizes))
         
         # two global critics per agent (two for stable learning), 
         #   gets combination set of all obs and actions of all agents, but is only used while training
@@ -78,8 +74,6 @@ class Agents:
         # get global obs and action size
         obs_size_global = sum([obs.shape[0] for obs in self.env.observation_space])
         act_size_global = sum([act.shape[0] for act in self.env.action_space])
-        print("obs", obs_size_global)
-        print("act", act_size_global)
         for act_space in self.env.action_space: 
             self.critics1.append(Critic(lr_critic, obs_size_global, act_size_global, layer_sizes))
             self.critics2.append(Critic(lr_critic, obs_size_global, act_size_global, layer_sizes))

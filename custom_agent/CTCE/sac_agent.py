@@ -8,18 +8,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as functional
 
+from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
+
+from custom_reward.custom_reward import CustomReward
+
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-# import replay_buffer
-# import critic
-# import actor
-
-from replay_buffer import ReplayBuffer
-from critic import Critic
-from actor import Actor
+from ..SAC_components.replay_buffer import ReplayBuffer
+from ..SAC_components.critic import Critic
+from ..SAC_components.actor import Actor
+from ..SAC_components.logger import Logger
 
 from copy import deepcopy
 
@@ -55,6 +56,13 @@ class Agent:
         self.gamma = gamma
         self.polyak = polyak
         self.batch_size = batch_size
+
+        # for now done like this: check if citylearn env with custom reward function for 
+        #   additional logging
+        self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
+
+        # initialize logger
+        self.logger = Logger(self.env)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -63,7 +71,7 @@ class Agent:
         self.replay_buffer = ReplayBuffer(buffer_max_size, env.observation_space.shape, env.action_space.shape, batch_size)
         
         # initialize networks
-        self.actor = Actor(lr_actor, env.observation_space.shape[0], env.action_space.shape[0], env.action_space.high[0], layer_sizes)
+        self.actor = Actor(lr_actor, env.observation_space.shape[0], env.action_space.shape[0], env.action_space.low, env.action_space.high, layer_sizes)
         self.critic1 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
         self.critic2 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
 
@@ -239,8 +247,9 @@ class Agent:
                 episode average critic loss, episode average policy entropy, and total steps.
         """
         # reset env
-        obs = self.env.reset()
+        obs, info = self.env.reset()
         # obs, info = self.env.reset()
+        # print(obs)
 
         # episode and epsiode len count
         ep = 0
@@ -254,15 +263,6 @@ class Agent:
         ep_alpha_sum = 0
         ep_alphaloss_sum = 0
         ep_entr_sum = 0
-
-        # logging values
-        logs = pd.DataFrame(index = None, columns = ["step", 
-                                                     "avg_reward", 
-                                                     "avg_actor_loss", 
-                                                     "avg_critic_loss", 
-                                                     "avg_policy_entr",
-                                                     "avg_alpha",
-                                                     "avg_alpha_loss"])
         
         for step in (pbar := tqdm(range(nr_steps))):
             # sample action (uniform sample for warmup)
@@ -273,9 +273,10 @@ class Agent:
                 # obs = torch.tensor(obs, dtype = torch.float32)
                 # get action
                 action = self.get_action(obs)
+                # print(action)
 
             # transition
-            next_obs, reward, done, info = self.env.step(action)
+            next_obs, reward, done, truncated, info = self.env.step(action)
             # next_obs, reward, done, truncated, info = self.env.step(action)
             
             # step increment 
@@ -290,8 +291,7 @@ class Agent:
             obs = next_obs
 
             # done or max steps
-            if (done or ep_steps == max_episode_len):
-            # if (done or truncated or ep_steps == max_episode_len):
+            if (done or truncated or ep_steps == max_episode_len):
                 ep += 1
 
                 # avg reward
@@ -303,22 +303,26 @@ class Agent:
                     avg_policy_entr = ep_entr_sum / ep_learn_steps
                     avg_alpha = ep_alpha_sum / ep_learn_steps
                     avg_alpha_loss = ep_alphaloss_sum / ep_learn_steps
-                    # save logs: 
-                    logs = logs.append({"step": step, 
-                                        "avg_reward": avg_rew,
-                                        "avg_actor_loss": avg_actor_loss,
-                                        "avg_critic_loss": avg_critic_loss,
-                                        "avg_alpha_loss": avg_alpha_loss,
-                                        "avg_alpha": avg_alpha,
-                                        "avg_policy_entr": avg_policy_entr}, ignore_index = True)
-                else:
-                    logs = logs.append({"step": step, "avg_reward": avg_rew}, ignore_index = True)
+                    # save training logs: 
+                    logs = {"avg_actor_loss": avg_actor_loss,
+                            "avg_critic_loss": avg_critic_loss,
+                            "avg_alpha_loss": avg_alpha_loss,
+                            "avg_alpha": avg_alpha,
+                            "avg_policy_entr": avg_policy_entr}
+                    self.logger.log(logs, step, group = "train")
+                # log reward seperately
+                reward_log = {"avg_reward": avg_rew}
+                self.logger.log(reward_log, step, "Reward")
+
+                # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
+                if self.citylearn:
+                    self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
                 pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, avg_rew))
                 
                 # reset
-                obs = self.env.reset()
+                obs, info = self.env.reset()
                 # reset logging info
                 ep_steps = 0
                 ep_rew_sum = 0

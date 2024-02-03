@@ -20,13 +20,14 @@ class Actor(MultiLayerPerceptron):
             such that we get the appropriate action value
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, action_size, action_max, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, action_size, action_low, action_high, layer_sizes = (256, 256)):
         super().__init__(lr = lr,
                          input_size = obs_size, 
                          output_size = (action_size, action_size), 
                          layer_sizes = layer_sizes)
         # action scaling
-        self.action_max = action_max
+        self.action_high = torch.tensor(action_high, dtype = torch.float32).to(self.device)
+        self.action_low = torch.tensor(action_low, dtype = torch.float32).to(self.device)
 
         # clamping region, values taken from paper
         self.clamp_log_min = -20  # -5 also used
@@ -45,7 +46,24 @@ class Actor(MultiLayerPerceptron):
         std = log_std.exp()
 
         return mean, std
+    
+    def scale_action(self, action, lower_bound, higher_bound):
+        """
+        Rescale the action from [low, high] to [lower_bound, upper_bound]
+        (no need for symmetric action space)
+        """
+        return (abs(lower_bound + higher_bound)) * ((action - self.action_low) / (self.action_high - self.action_low)) - lower_bound
+    
+    def unscale_action(self, scaled_action):
+        """
+        Rescale the action from [-1, 1] to [low, high]
+        (no need for symmetric action space)
 
+        :param scaled_action: Action to un-scale
+        """
+        return self.action_low + (0.5 * (scaled_action + 1.0) * (self.action_high - self.action_low))
+
+    
     def normal_distr_sample(self, obs, reparameterize = True, deterministic = False):
         mean, std = self.forward(obs)
         
@@ -55,7 +73,6 @@ class Actor(MultiLayerPerceptron):
         # if we need to evaluate the policy
         if deterministic:
             sample = mean
-        
         # add noise to values (reparameterize trick; exploration)
         #   (mean + std * N(0, I))
         elif reparameterize:
@@ -72,9 +89,8 @@ class Actor(MultiLayerPerceptron):
 
         # final action
         #   constrain action within [-1, 1] with tanh,
-        #   scale using action max for regular action range.
-        #   This is different to SAC from other algorithms.
-        action = torch.tanh(sample) * self.action_max
+        #   unscale for regular action range.
+        action = self.unscale_action(torch.tanh(sample))
         action = action.to(self.device) # should be on device
 
         return action, log_prob

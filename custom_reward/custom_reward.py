@@ -573,12 +573,19 @@ class CustomReward(RewardFunction):
             # current building power outage
             if obs["power_outage"]:
                 # total demand (cooling, dmh, non-shiftable load energy demand):
+                # we regulate if non_shiftable 
                 expected = obs["cooling_demand"] + obs["heating_demand"]\
                             + obs["dhw_demand"] + obs["non_shiftable_load"]
+                
+                # print(obs["non_shiftable_load_demand_without_control"], obs["non_shiftable_load"])
+                # print(obs["net_electricity_consumption_without_storage"])
+                # print(obs["solar_generation"])
+                # print(obs["electrical_storage_soc"])
 
-                # total energy supply (electrical storage)
+                # total energy supply
+                # served = obs["net_electricity_consumption_without_storage"]
                 # served = obs["cooling_electricity_consumption"] + obs["heating_electricity_consumption"]\
-                #          + obs["dhw_storage_electricity_consumption"] + obs[""]
+                #          + obs["dhw_electricity_consumption"] # + obs["net_electrical_consumption_without_storage"]
 
                 # NOTE: These are legitimate observations, but not active in the citylearn challenge
                 # ..._storage_electricity_consumption = 
@@ -597,6 +604,12 @@ class CustomReward(RewardFunction):
                 #              + obs["heating_electricity_consumption"]
                 #              + obs["dhw_electricity_consumption"]
                 #              + obs["electrical_electricity_consumption"])
+                # OR
+                # we take the net elec consumption without storage, which sums up the storage elec consumption 
+                #     and adds it to the net elec consumption, which is zero in a power outage
+                # NOTE: This is a workaround to having to use different observations, but this observation is also not
+                #       part of the citylearn challenge, and is added through the environment creation schema file
+                # served = abs(obs["net_electricity_consumption_without_storage"])
                         
                 # in docs cost functions: served_energy = b.energy_from_cooling_device + b.energy_from_cooling_storage\
                                                             # + b.energy_from_heating_device + b.energy_from_heating_storage\
