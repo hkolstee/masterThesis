@@ -61,7 +61,7 @@ class Agent:
         #   additional logging
         self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
 
-        # initialize logger
+        # initialize tensorboard logger
         self.logger = Logger(self.env)
         
         # initialize device
