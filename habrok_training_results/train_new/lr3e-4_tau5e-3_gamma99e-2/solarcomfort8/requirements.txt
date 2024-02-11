@@ -1,8 +1,0 @@
-wheel==0.37.0
-gym==0.21.0
-citylearn
-stable-baselines3[extra]
-numpy
-pandas
-gast==0.4.0
-protobuf==3.19
