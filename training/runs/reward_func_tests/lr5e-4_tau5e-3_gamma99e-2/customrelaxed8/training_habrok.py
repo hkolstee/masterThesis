@@ -16,6 +16,10 @@ from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, CallbackList
 from stable_baselines3.common.vec_env import VecEnv
 
+# append path to import from parent folder
+from os import path
+sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
+
 from custom_reward import CustomReward
 
 class CustomCallback(BaseCallback):

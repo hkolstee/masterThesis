@@ -17,6 +17,6 @@ module --ignore_cache load CUDA/11.7.0
 
 source $HOME/masterThesis/venv/bin/activate
 
-python3 training_habrok.py
+python3 train.py
 
 deactivate

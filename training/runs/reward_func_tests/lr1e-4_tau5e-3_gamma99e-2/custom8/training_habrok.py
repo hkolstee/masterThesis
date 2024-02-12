@@ -6,9 +6,9 @@ import pandas as pd
 import math
 import sys
 import os
-from os import path
 
 # append path to import from parent folder
+from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
 import gym
