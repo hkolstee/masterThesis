@@ -147,10 +147,9 @@ class Agent:
             bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-            # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
         loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
         loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        loss_critic = loss_critic1 + loss_critic2
+        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
         # backward prop
         loss_critic.backward()

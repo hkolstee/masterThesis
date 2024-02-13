@@ -5,7 +5,7 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
 # custom imports
-from custom_agent.CTDE.ma_sac_agents_single_act import Agents
+from custom_agent.CTDE.ma_sac_agents import Agents
 from custom_reward.custom_reward import CustomReward
 
 # citylearn environment
