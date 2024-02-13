@@ -194,7 +194,7 @@ class Agents:
                 # clipped double Q trick
                 q_targ = torch.min(q1_policy_targ, q2_policy_targ)
                 # Bellman approximation
-                bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_observations[agent_idx])
+                bellman = np.mean(rewards) + self.gamma * (1 - dones[0]) * (q_targ - np.mean(self.alphas) * log_prob_next_observations[agent_idx])
             
             # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
                 # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
