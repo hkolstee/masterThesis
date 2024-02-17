@@ -3,9 +3,7 @@ import os
 import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as functional
-import torch.optim as optim
 
 from MLP import MultiLayerPerceptron
 
@@ -94,3 +92,5 @@ class Actor(MultiLayerPerceptron):
         action = action.to(self.device) # should be on device
 
         return action, log_prob
+    
+    

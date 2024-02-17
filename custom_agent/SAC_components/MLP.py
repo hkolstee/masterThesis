@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 import torch
@@ -91,3 +93,58 @@ class MultiLayerPerceptron(nn.Module):
                     out.append(self.layers[idx](data))
         
         return out
+    
+    def save(self, save_dir, file_name):
+        """Save the models weights.
+
+        Args:
+            save_dir (str): Directory to save to.
+        """
+        torch.save(self.state_dict(), os.join.path(save_dir, file_name))
+
+    def save_checkpoint(self, save_dir, file_name, optimizer, loss, step):
+        """Save the model weights along with checkpoint information.
+
+        Args:
+            save_dir (str): Directory to save to.
+            file_name (str): File name to save.
+            step (int): Checkpoint step in training.
+            optimizer (torch.optim): The optimizer to save along with the model.
+            loss (float): Checkpoint loss.
+        """
+        # create checkpoint dict
+        checkpoint = {
+            "model_state_dict": self.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "loss": loss,
+            "step": step,
+        }
+        # save model weights as file
+        torch.save(checkpoint, os.join.path(save_dir, file_name))
+
+    def load(self, file_path):
+        """Load the models weights.
+
+        Args:
+            file_path (str): Directory of file to load.
+        """
+        self.load_state_dict(torch.load(file_path))
+
+    def load_checkpoint(self, checkpoint_file_path):
+        """Load model weights along with checkpoint information.
+
+        Args:
+            checkpoint_file_path (str): Checkpoint file path.
+
+        Returns:
+            loss (float): Loss at checkpoint.
+            step (int): Step at checkpoint.
+        """
+        # load checkpoint dict
+        checkpoint = torch.load(checkpoint_file_path)
+        # load model
+        self.load_state_dict(checkpoint["model_state_dict"])
+        # load optimizer
+        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        
+        return checkpoint["loss"], checkpoint["step"]
