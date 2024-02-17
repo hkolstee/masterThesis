@@ -199,7 +199,7 @@ class Agents:
                     # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
                 loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
                 loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-                loss_critic = loss_critic1 + loss_critic2
+                loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
                 # backward prop
                 loss_critic.backward()

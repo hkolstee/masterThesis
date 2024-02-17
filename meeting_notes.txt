@@ -1,0 +1,21 @@
+MEETING NOTES 13/02
+
+First note:
+CityLearn 2023 winners, not much RL. For the competition, they changed the environment to not include crucial information
+in the reward calculation, which is available in the current normal version of citylearn, such as how much energy from 
+storage was used. Therefore, it makes sense that this has to be modelled to gain this critical information. I think this 
+is the reason that we don't see model-free RL winners. 
+
+Implemented: 
+- SAC, most modern implementation (no value networks, automatic entropy tuning)
+- MASAC, 1: one set of critics for each agent, one global set of critics, critics take global observations and actions
+- Ensemble method
+
+To implement based on ensemble paper/presentation:
+- Autoencoder
+- Add Diversity via Determinants component to actor loss function during training to promote diversity in policies
+
+Questions:
+1. The complexity of the Multi-Agent SAC implementation grows linearly with number of agents when using same layer sizes,
+    what should I do?
+
