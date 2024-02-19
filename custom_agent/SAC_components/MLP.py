@@ -100,7 +100,8 @@ class MultiLayerPerceptron(nn.Module):
         Args:
             save_dir (str): Directory to save to.
         """
-        torch.save(self.state_dict(), os.join.path(save_dir, file_name))
+        os.makedirs(save_dir, exist_ok = True)
+        torch.save(self.state_dict(), os.path.join(save_dir, file_name))
 
     def save_checkpoint(self, save_dir, file_name, optimizer, loss, step):
         """Save the model weights along with checkpoint information.
@@ -120,7 +121,8 @@ class MultiLayerPerceptron(nn.Module):
             "step": step,
         }
         # save model weights as file
-        torch.save(checkpoint, os.join.path(save_dir, file_name))
+        os.makedirs(save_dir, exist_ok = True)
+        torch.save(checkpoint, os.path.join(save_dir, file_name))
 
     def load(self, file_path):
         """Load the models weights.

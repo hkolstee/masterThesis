@@ -295,7 +295,7 @@ class Agents:
 
         return action_list
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
         """Train the SAC agent.
 
         Args:
@@ -403,6 +403,16 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-
+                        
+            # checkpoint
+            if (step % checkpoint == 0):
+                for actor_idx in range(len(self.actors)):
+                    self.actors[actor_idx].save("models", "actor" + str(actor_idx) + "_" + str(step))
+                for critic_idx in range(len(self.critics1)):
+                    self.critics1[critic_idx].save("models", "critic1" + str(critic_idx) + "_" + str(step))
+                    self.critics2[critic_idx].save("models", "critic2" + str(critic_idx) + "_" + str(step))
+                for critic_targ_idx in range(len(self.critics2_targ)):
+                    self.critics1_targ[critic_targ_idx].save("models", "critic1_targ" + str(critic_targ_idx) + "_" + str(step))
+                    self.critics2_targ[critic_targ_idx].save("models", "critic2_targ" + str(critic_targ_idx) + "_" + str(step))
 
 

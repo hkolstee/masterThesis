@@ -3,9 +3,7 @@ import os
 import numpy as np
 
 import torch
-import torch.nn as nn
 import torch.nn.functional as functional
-import torch.optim as optim
 
 from MLP import MultiLayerPerceptron
 
@@ -63,7 +61,6 @@ class Actor(MultiLayerPerceptron):
         """
         return self.action_low + (0.5 * (scaled_action + 1.0) * (self.action_high - self.action_low))
 
-    
     def normal_distr_sample(self, obs, reparameterize = True, deterministic = False):
         mean, std = self.forward(obs)
         
@@ -94,3 +91,5 @@ class Actor(MultiLayerPerceptron):
         action = action.to(self.device) # should be on device
 
         return action, log_prob
+    
+    

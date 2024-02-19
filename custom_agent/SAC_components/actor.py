@@ -61,7 +61,6 @@ class Actor(MultiLayerPerceptron):
         """
         return self.action_low + (0.5 * (scaled_action + 1.0) * (self.action_high - self.action_low))
 
-    
     def normal_distr_sample(self, obs, reparameterize = True, deterministic = False):
         mean, std = self.forward(obs)
         

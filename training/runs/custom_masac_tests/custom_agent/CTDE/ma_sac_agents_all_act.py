@@ -152,33 +152,34 @@ class Agents:
         
         # sample from buffer 
         #   list of batches (one for each agent, same indices out of buffer and therefore same multi-agent transition)
-        obs_list, replay_actions_list, rewards_list, next_obs_list, dones_list = self.replay_buffer.sample()
+        obs_list, replay_act_list, rewards_list, next_obs_list, dones_list = self.replay_buffer.sample()
 
         # prepare tensors
-        observations = [torch.tensor(obs, dtype=torch.float32).to(self.device) for obs in obs_list]
-        next_observations = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
-        replay_actions = [torch.tensor(actions, dtype=torch.float32).to(self.device) for actions in replay_actions_list]
+        obs = [torch.tensor(obs, dtype=torch.float32).to(self.device) for obs in obs_list]
+        next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
+        replay_act = [torch.tensor(actions, dtype=torch.float32).to(self.device) for actions in replay_act_list]
         rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
 
         # combi set of states and actions from all agents for the critics (shape = (batch, total_obs)
-        obs_set = torch.cat(observations, dim = 1)
-        next_obs_set = torch.cat(next_observations, dim = 1)
-        replay_act_set = torch.cat(replay_actions, dim = 1)
+        obs_set = torch.cat(obs, dim = 1)
+        next_obs_set = torch.cat(next_obs, dim = 1)
+        replay_act_set = torch.cat(replay_act, dim = 1)
         # we also need a combi set of the actions of the policy (on both pre-transition observations and next observations)
         # when sampling the next observations we don't track the gradient as it is for the critics gradient updates
         with torch.no_grad():
-            policy_act_next_observations, log_prob_next_observations = \
-                zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_observations)])
-            policy_act_next_obs_set = torch.cat(policy_act_next_observations, axis = 1)
+            policy_act_next_obs, log_prob_next_obs = \
+                zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_obs)])
+            policy_act_next_obs_set = torch.cat(policy_act_next_obs, axis = 1)
         
         with torch.autograd.set_detect_anomaly(True):
+            # set actor gradients to zero
             for actor in self.actors:
                 actor.optimizer.zero_grad()    
             
             # with grad 
             policy_act_prev_obs, log_prob_prev_obs = \
-                zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, observations)])
+                zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, obs)])
             # create entire set, without grad
             policy_act_prev_obs_nograd = [act.detach() for act in policy_act_prev_obs]
             
@@ -203,7 +204,7 @@ class Agents:
                     # clipped double Q trick
                     q_targ = torch.min(q1_policy_targ, q2_policy_targ)
                     # Bellman approximation
-                    bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_observations[agent_idx])
+                    bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_obs[agent_idx])
                 
                 # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
                     # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
@@ -294,7 +295,7 @@ class Agents:
 
         return action_list
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
         """Train the SAC agent.
 
         Args:
@@ -402,6 +403,16 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-
+                        
+            # checkpoint
+            if (step % checkpoint == 0):
+                for actor_idx in range(len(self.actors)):
+                    self.actors[actor_idx].save("models", "actor" + str(actor_idx) + "_" + str(step))
+                for critic_idx in range(len(self.critics1)):
+                    self.critics1[critic_idx].save("models", "critic1" + str(critic_idx) + "_" + str(step))
+                    self.critics2[critic_idx].save("models", "critic2" + str(critic_idx) + "_" + str(step))
+                for critic_targ_idx in range(len(self.critics2_targ)):
+                    self.critics1_targ[critic_targ_idx].save("models", "critic1_targ" + str(critic_targ_idx) + "_" + str(step))
+                    self.critics2_targ[critic_targ_idx].save("models", "critic2_targ" + str(critic_targ_idx) + "_" + str(step))
 
 

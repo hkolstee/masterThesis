@@ -194,7 +194,7 @@ class Agents:
                 # clipped double Q trick
                 q_targ = torch.min(q1_policy_targ, q2_policy_targ)
                 # Bellman approximation
-                bellman = torch.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_observations[agent_idx]) for agent_idx in range(self.nr_agents)])
+                bellman = np.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_observations[agent_idx]) for agent_idx in range(self.nr_agents)])
             
             # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
             loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
@@ -286,7 +286,7 @@ class Agents:
 
         return action_list
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
         """Train the SAC agent.
 
         Args:
@@ -394,6 +394,16 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
+                    
+            # checkpoint
+            if (step % checkpoint == 0):
+                for actor_idx in range(len(self.actors)):
+                    self.actors[actor_idx].save("models", "actor" + str(actor_idx) + "_" + str(step))
+                self.critic1.save("models", "critic1" + "_" + str(step))
+                self.critic2.save("models", "critic2" + "_" + str(step))
+                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))
+
 
 
 
