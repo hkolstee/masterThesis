@@ -21,12 +21,13 @@ from ..SAC_components.replay_buffer import ReplayBuffer
 from ..SAC_components.critic import Critic
 from ..SAC_components.actor import Actor
 from ..SAC_components.logger import Logger
+from ..SAC_components.sac import SAC
 
 from copy import deepcopy
 
 from tqdm import tqdm
 
-class Agent:
+class Agent(SAC):
     """
     An Soft Actor-Critic agent.
 
@@ -52,6 +53,9 @@ class Agent:
                  batch_size = 256,
                  layer_sizes = (256, 256),
                  ):
+        # init sac base class (gradient functions)
+        super().__init__(gamma)
+        
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -114,15 +118,6 @@ class Agent:
             # return status 0
             return 0, None, None, None, None, None
         
-        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-        # we detach because otherwise we backward through the graph of previous calculations using log_prob
-        #   which also raises an error fortunately, otherwise I would have missed this
-        self.alpha_optimizer.zero_grad()
-        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).detach().mean()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()   
-        
         # sample from buffer
         obs, replay_actions, rewards, next_obs, dones = self.replay_buffer.sample()
 
@@ -132,33 +127,25 @@ class Agent:
         replay_actions = torch.tensor(replay_actions, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
+        
+        # compute current policy action for pre-transition observation
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+        
+        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        self.alpha_optimizer.zero_grad()
+        # alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).detach().mean()
+        alpha_loss = self.alphaLoss(self.alpha, log_prob_prev_obs, self.entropy_targ)
+        alpha_loss.backward()
+        self.alpha_optimizer.step()   
 
         # CRITIC GRADIENT
         # reset gradients
         self.critic1.optimizer.zero_grad()
         self.critic2.optimizer.zero_grad()
         
-        # These Q values are the left hand side of the loss function
-        q1_buffer = self.critic1.forward(obs, replay_actions)
-        q2_buffer = self.critic2.forward(obs, replay_actions)
-        
-        # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
-        with torch.no_grad():
-            # targets from current policy (old policy = buffer)
-            policy_actions_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
-
-            # target q values
-            q1_policy_targ = self.critic1_targ.forward(next_obs, policy_actions_next_obs)
-            q2_policy_targ = self.critic2_targ.forward(next_obs, policy_actions_next_obs)
-            # clipped double Q trick
-            q_targ = torch.min(q1_policy_targ, q2_policy_targ)
-            # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha.detach() * log_prob_next_obs)
-        
-        # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+        # calculate loss
+        loss_critic = self.criticLoss(self.actor, self.critic1, self.critic2, self.critic1_targ, 
+            self.critic2_targ, self.alpha, obs, replay_actions, next_obs, dones, rewards)
 
         # backward prop
         loss_critic.backward()
@@ -176,16 +163,9 @@ class Agent:
         # reset actor gradient
         self.actor.optimizer.zero_grad()
 
-        # compute current policy action for pre-transition observation
-        policy_actions_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
-        # compute Q-values
-        q1_policy = self.critic1.forward(obs, policy_actions_prev_obs)
-        q2_policy = self.critic2.forward(obs, policy_actions_prev_obs)
-        # take min of these two 
-        #   = clipped Q-value for stable learning, reduces overestimation
-        q_policy = torch.min(q1_policy, q2_policy)
-        # entropy regularized loss
-        loss_policy = (self.alpha.detach() * log_prob_prev_obs - q_policy).mean()
+        # calculate actor loss
+        loss_policy = self.actorLoss(self.actor, self.critic1, self.critic2, self.alpha, obs,
+                                     policy_act_prev_obs, log_prob_prev_obs)
 
         # backward prop
         loss_policy.backward()
@@ -257,7 +237,7 @@ class Agent:
         ep_alphaloss_sum = 0
         ep_entr_sum = 0
         
-        for step in (pbar := tqdm(range(nr_steps))):
+        for step in range(nr_steps):
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = self.env.action_space.sample()
@@ -281,6 +261,7 @@ class Agent:
 
             # done or max steps
             if (done or truncated or ep_steps == max_episode_len):
+                print(ep_rew_sum)
                 ep += 1
 
                 # avg losses and entropy
@@ -306,7 +287,8 @@ class Agent:
                     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                pbar.set_description("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
+                if (ep % 50 == 0):
+                    print("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
                 
                 # reset
                 obs, info = self.env.reset()

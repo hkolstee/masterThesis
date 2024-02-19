@@ -1,111 +1,0 @@
-The following modules were not unloaded:
-  (Use "module --force purge" to unload all):
-
-  1) 2023.01   2) StdEnv
-
-The following have been reloaded with a version change:
-  1) GCCcore/12.2.0 => GCCcore/11.3.0
-  2) GMP/6.2.1-GCCcore-12.2.0 => GMP/6.2.1-GCCcore-11.3.0
-  3) Python/3.10.8-GCCcore-12.2.0 => Python/3.10.4-GCCcore-11.3.0
-  4) SQLite/3.39.4-GCCcore-12.2.0 => SQLite/3.38.3-GCCcore-11.3.0
-  5) Tcl/8.6.12-GCCcore-12.2.0 => Tcl/8.6.12-GCCcore-11.3.0
-  6) XZ/5.2.7-GCCcore-12.2.0 => XZ/5.2.5-GCCcore-11.3.0
-  7) binutils/2.39-GCCcore-12.2.0 => binutils/2.38-GCCcore-11.3.0
-  8) bzip2/1.0.8-GCCcore-12.2.0 => bzip2/1.0.8-GCCcore-11.3.0
-  9) libffi/3.4.4-GCCcore-12.2.0 => libffi/3.4.2-GCCcore-11.3.0
- 10) libreadline/8.2-GCCcore-12.2.0 => libreadline/8.1.2-GCCcore-11.3.0
- 11) ncurses/6.3-GCCcore-12.2.0 => ncurses/6.3-GCCcore-11.3.0
- 12) zlib/1.2.12-GCCcore-12.2.0 => zlib/1.2.12-GCCcore-11.3.0
-
-
-The following have been reloaded with a version change:
-  1) FFTW/3.3.10-GCC-11.3.0 => FFTW/3.3.10-GCC-12.3.0
-  2) FlexiBLAS/3.2.0-GCC-11.3.0 => FlexiBLAS/3.3.1-GCC-12.3.0
-  3) GCC/11.3.0 => GCC/12.3.0
-  4) GCCcore/11.3.0 => GCCcore/12.3.0
-  5) OpenBLAS/0.3.20-GCC-11.3.0 => OpenBLAS/0.3.23-GCC-12.3.0
-  6) Python/3.10.4-GCCcore-11.3.0 => Python/3.11.3-GCCcore-12.3.0
-  7) SQLite/3.38.3-GCCcore-11.3.0 => SQLite/3.42.0-GCCcore-12.3.0
-  8) SciPy-bundle/2022.05-foss-2022a => SciPy-bundle/2023.07-gfbf-2023a
-  9) Tcl/8.6.12-GCCcore-11.3.0 => Tcl/8.6.13-GCCcore-12.3.0
- 10) XZ/5.2.5-GCCcore-11.3.0 => XZ/5.4.2-GCCcore-12.3.0
- 11) binutils/2.38-GCCcore-11.3.0 => binutils/2.40-GCCcore-12.3.0
- 12) bzip2/1.0.8-GCCcore-11.3.0 => bzip2/1.0.8-GCCcore-12.3.0
- 13) libffi/3.4.2-GCCcore-11.3.0 => libffi/3.4.4-GCCcore-12.3.0
- 14) libreadline/8.1.2-GCCcore-11.3.0 => libreadline/8.2-GCCcore-12.3.0
- 15) ncurses/6.3-GCCcore-11.3.0 => ncurses/6.4-GCCcore-12.3.0
- 16) pybind11/2.9.2-GCCcore-11.3.0 => pybind11/2.11.1-GCCcore-12.3.0
- 17) zlib/1.2.12-GCCcore-11.3.0 => zlib/1.2.13-GCCcore-12.3.0
-
-
-The following have been reloaded with a version change:
-  1) GCCcore/12.3.0 => GCCcore/11.3.0
-  2) Python/3.11.3-GCCcore-12.3.0 => Python/3.10.4-GCCcore-11.3.0
-  3) SQLite/3.42.0-GCCcore-12.3.0 => SQLite/3.38.3-GCCcore-11.3.0
-  4) SciPy-bundle/2023.07-gfbf-2023a => SciPy-bundle/2022.05-foss-2022a
-  5) Tcl/8.6.13-GCCcore-12.3.0 => Tcl/8.6.12-GCCcore-11.3.0
-  6) XZ/5.4.2-GCCcore-12.3.0 => XZ/5.2.5-GCCcore-11.3.0
-  7) binutils/2.40-GCCcore-12.3.0 => binutils/2.38-GCCcore-11.3.0
-  8) bzip2/1.0.8-GCCcore-12.3.0 => bzip2/1.0.8-GCCcore-11.3.0
-  9) libffi/3.4.4-GCCcore-12.3.0 => libffi/3.4.2-GCCcore-11.3.0
- 10) libreadline/8.2-GCCcore-12.3.0 => libreadline/8.1.2-GCCcore-11.3.0
- 11) ncurses/6.4-GCCcore-12.3.0 => ncurses/6.3-GCCcore-11.3.0
- 12) pybind11/2.11.1-GCCcore-12.3.0 => pybind11/2.9.2-GCCcore-11.3.0
- 13) zlib/1.2.13-GCCcore-12.3.0 => zlib/1.2.12-GCCcore-11.3.0
-
-/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gym/spaces/box.py:73: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
-  logger.warn(
-2024-02-13 11:37:58.548842: I tensorflow/core/util/port.cc:104] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
-/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gym/spaces/box.py:73: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
-  logger.warn(
-  0%|          | 0/3960000 [00:00<?, ?it/s]  0%|          | 13/3960000 [00:00<8:28:20, 129.83it/s]  0%|          | 26/3960000 [00:00<10:34:33, 104.01it/s]  0%|          | 37/3960000 [00:00<11:11:03, 98.35it/s]   0%|          | 47/3960000 [00:00<11:29:30, 95.72it/s]  0%|          | 57/3960000 [00:00<11:41:24, 94.09it/s]  0%|          | 67/3960000 [00:00<11:48:22, 93.17it/s]  0%|          | 77/3960000 [00:00<11:53:14, 92.53it/s]  0%|          | 87/3960000 [00:00<11:57:54, 91.93it/s]  0%|          | 97/3960000 [00:01<11:59:40, 91.71it/s]  0%|          | 107/3960000 [00:01<12:06:08, 90.89it/s]  0%|          | 117/3960000 [00:01<12:05:33, 90.96it/s]  0%|          | 127/3960000 [00:01<12:04:37, 91.08it/s]  0%|          | 137/3960000 [00:01<12:05:25, 90.98it/s]  0%|          | 147/3960000 [00:01<12:04:41, 91.07it/s]  0%|          | 157/3960000 [00:01<12:04:30, 91.09it/s]  0%|          | 167/3960000 [00:01<12:05:07, 91.02it/s]  0%|          | 177/3960000 [00:01<12:04:48, 91.05it/s]  0%|          | 187/3960000 [00:02<12:05:02, 91.02it/s]  0%|          | 197/3960000 [00:02<12:05:50, 90.92it/s]  0%|          | 207/3960000 [00:02<12:05:10, 91.01it/s]  0%|          | 217/3960000 [00:02<12:04:57, 91.03it/s]  0%|          | 227/3960000 [00:02<12:05:09, 91.01it/s]  0%|          | 237/3960000 [00:02<12:04:49, 91.05it/s]  0%|          | 247/3960000 [00:02<12:05:36, 90.95it/s]  0%|          | 257/3960000 [00:02<12:05:42, 90.94it/s]  0%|          | 267/3960000 [00:02<12:05:33, 90.96it/s]  0%|          | 277/3960000 [00:03<12:06:55, 90.79it/s]  0%|          | 287/3960000 [00:03<12:06:52, 90.79it/s]  0%|          | 297/3960000 [00:03<12:07:18, 90.74it/s]  0%|          | 307/3960000 [00:03<12:06:44, 90.81it/s]  0%|          | 317/3960000 [00:03<12:10:26, 90.35it/s]  0%|          | 327/3960000 [00:03<12:08:59, 90.53it/s]  0%|          | 337/3960000 [00:03<12:07:39, 90.69it/s]  0%|          | 347/3960000 [00:03<12:07:39, 90.69it/s]  0%|          | 357/3960000 [00:03<12:06:20, 90.86it/s]  0%|          | 367/3960000 [00:03<12:06:10, 90.88it/s]  0%|          | 377/3960000 [00:04<12:05:55, 90.91it/s]  0%|          | 387/3960000 [00:04<12:05:12, 91.00it/s]  0%|          | 397/3960000 [00:04<12:06:55, 90.79it/s]  0%|          | 407/3960000 [00:04<12:07:39, 90.69it/s]  0%|          | 417/3960000 [00:04<12:39:51, 86.85it/s]  0%|          | 427/3960000 [00:04<12:31:06, 87.86it/s]  0%|          | 437/3960000 [00:04<12:23:13, 88.79it/s]  0%|          | 447/3960000 [00:04<12:19:28, 89.24it/s]  0%|          | 457/3960000 [00:05<12:15:14, 89.76it/s]  0%|          | 467/3960000 [00:05<12:12:32, 90.09it/s]  0%|          | 477/3960000 [00:05<12:11:25, 90.22it/s]  0%|          | 487/3960000 [00:05<12:09:38, 90.44it/s]  0%|          | 497/3960000 [00:05<12:09:34, 90.45it/s]  0%|          | 507/3960000 [00:05<12:08:39, 90.57it/s]  0%|          | 517/3960000 [00:05<12:11:06, 90.26it/s]  0%|          | 527/3960000 [00:05<12:09:42, 90.44it/s]  0%|          | 537/3960000 [00:05<12:08:39, 90.56it/s]  0%|          | 547/3960000 [00:05<12:09:08, 90.51it/s]  0%|          | 557/3960000 [00:06<12:08:08, 90.63it/s]  0%|          | 567/3960000 [00:06<12:09:12, 90.50it/s]  0%|          | 577/3960000 [00:06<12:08:14, 90.62it/s]  0%|          | 587/3960000 [00:06<12:08:44, 90.55it/s]  0%|          | 597/3960000 [00:06<12:08:58, 90.53it/s]  0%|          | 607/3960000 [00:06<12:09:00, 90.52it/s]  0%|          | 617/3960000 [00:06<12:11:52, 90.17it/s]  0%|          | 627/3960000 [00:06<12:10:14, 90.37it/s]  0%|          | 637/3960000 [00:06<12:10:45, 90.30it/s]  0%|          | 647/3960000 [00:07<12:10:46, 90.30it/s]  0%|          | 657/3960000 [00:07<12:10:38, 90.32it/s]  0%|          | 667/3960000 [00:07<12:10:04, 90.39it/s]  0%|          | 677/3960000 [00:07<12:09:56, 90.40it/s]  0%|          | 687/3960000 [00:07<12:12:16, 90.11it/s]  0%|          | 697/3960000 [00:07<12:10:47, 90.30it/s]  0%|          | 707/3960000 [00:07<12:10:53, 90.28it/s]  0%|          | 717/3960000 [00:07<12:11:25, 90.22it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 717/3960000 [00:07<12:11:25, 90.22it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 727/3960000 [00:08<14:18:53, 76.83it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 738/3960000 [00:08<13:08:02, 83.74it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 748/3960000 [00:08<12:48:06, 85.91it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 758/3960000 [00:08<12:35:25, 87.35it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 768/3960000 [00:08<12:25:34, 88.50it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 778/3960000 [00:08<12:18:08, 89.40it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 788/3960000 [00:08<12:13:54, 89.91it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 798/3960000 [00:08<12:10:17, 90.36it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 808/3960000 [00:08<12:07:32, 90.70it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 818/3960000 [00:09<12:07:13, 90.74it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 828/3960000 [00:09<12:05:26, 90.96it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 838/3960000 [00:09<12:04:11, 91.12it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 848/3960000 [00:09<12:04:48, 91.04it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 858/3960000 [00:09<12:03:48, 91.16it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 868/3960000 [00:09<12:02:54, 91.28it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 878/3960000 [00:09<12:04:17, 91.10it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 888/3960000 [00:09<12:03:45, 91.17it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 898/3960000 [00:09<12:03:23, 91.22it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 908/3960000 [00:10<12:04:42, 91.05it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 918/3960000 [00:10<12:03:57, 91.14it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 928/3960000 [00:10<12:03:26, 91.21it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 938/3960000 [00:10<12:04:06, 91.12it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 948/3960000 [00:10<12:03:22, 91.22it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 958/3960000 [00:10<12:03:12, 91.24it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 968/3960000 [00:10<12:03:52, 91.15it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 978/3960000 [00:10<12:03:25, 91.21it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 988/3960000 [00:10<12:04:50, 91.03it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 998/3960000 [00:11<12:04:56, 91.02it/s][Episode 1 total reward: [-780.46917924 -703.54825048 -716.29241017]] ~ :   0%|          | 1001/3960000 [00:11<12:53:37, 85.29it/s]
-Traceback (most recent call last):
-  File "/home2/s3515249/masterThesis/train_new/custom_masac_tests/test_all_action_shared_critic/train.py", line 41, in <module>
-    main()
-  File "/home2/s3515249/masterThesis/train_new/custom_masac_tests/test_all_action_shared_critic/train.py", line 34, in main
-    sac_agent.train(nr_steps = 720 * 5500,
-  File "/home2/s3515249/masterThesis/train_new/custom_masac_tests/custom_agent/CTDE/ma_sac_agents_shared_critic.py", line 386, in train
-    status, loss_actor, loss_critic, policy_entropy, alpha, loss_alpha = self.learn()
-  File "/home2/s3515249/masterThesis/train_new/custom_masac_tests/custom_agent/CTDE/ma_sac_agents_shared_critic.py", line 197, in learn
-    bellman = torch.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_observations[agent_idx]) for agent_idx in range(self.nr_agents)])
-TypeError: mean(): argument 'input' (position 1) must be Tensor, not list
-
-###############################################################################
-Hábrók Cluster
-Job 7189338 for user s3515249
-Finished at: Tue Feb 13 11:38:14 CET 2024
-
-Job details:
-============
-
-Job ID              : 7189338
-Name                : citylearn_simple_policy_test
-User                : s3515249
-Partition           : gpulong
-Nodes               : a100gpu1
-Number of Nodes     : 1
-Cores               : 1
-Number of Tasks     : 1
-State               : COMPLETED
-Submit              : 2024-02-13T11:21:18
-Start               : 2024-02-13T11:37:15
-End                 : 2024-02-13T11:38:14
-Reserved walltime   : 2-04:00:00
-Used walltime       :   00:00:59
-Used CPU time       :   00:00:34 (efficiency: 57.67%)
-% User (Computation): 91.85%
-% System (I/O)      :  8.14%
-Mem reserved        : 14000M
-Max Mem (Node/step) : 1.13G (a100gpu1, per node)
-Full Max Mem usage  : 1.13G
-Total Disk Read     : 101.03M
-Total Disk Write    : 2.26M
-
-Acknowledgements:
-=================
-
-Please see this page for information about acknowledging Hábrók in your publications:
-
-https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
-
-################################################################################

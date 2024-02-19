@@ -312,7 +312,7 @@ class Agents:
         ep_alphaloss_sum = np.zeros(self.nr_agents)
         ep_entr_sum = np.zeros(self.nr_agents)
 
-        for step in (pbar := tqdm(range(nr_steps))):
+        for step in range(nr_steps):
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = [act_space.sample() for act_space in self.env.action_space]
@@ -362,7 +362,8 @@ class Agents:
                     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                pbar.set_description("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
+                if (ep % 50 == 0):
+                    print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                 # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
                 # reset

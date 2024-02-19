@@ -24,12 +24,13 @@ from ..SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
 from ..SAC_components.critic import Critic
 from ..SAC_components.actor import Actor
 from ..SAC_components.logger import Logger
+from ..SAC_components.sac import SAC
 
 from copy import deepcopy
 
 from tqdm import tqdm
 
-class Agents:
+class Agents(SAC):
     """
     Multi-agent Soft Actor-Critic centralized training decentralized execution agents.
     The critics are centralized, while the actors are decentralized.
@@ -61,6 +62,8 @@ class Agents:
         self.polyak = polyak
         self.batch_size = batch_size
         self.nr_agents = len(env.action_space)
+        # init super sac gradient func class
+        super().__init__(gamma)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -189,7 +192,8 @@ class Agents:
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
+            # alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
+            alpha_loss = self.alphaLoss(self.alphas[agent_idx], log_prob_prev_obs[agent_idx], self.entropy_targs[agent_idx])
             alpha_loss.backward()
             self.alpha_optimizer.step()   
 
@@ -198,28 +202,10 @@ class Agents:
             self.critics1[agent_idx].optimizer.zero_grad()
             self.critics2[agent_idx].optimizer.zero_grad()
             
-            # These Q values are the left hand side of the loss function
-            q1_buffer = self.critics1[agent_idx].forward(obs_set, replay_act_set)
-            q2_buffer = self.critics2[agent_idx].forward(obs_set, replay_act_set)
-            
-            # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
-            with torch.no_grad():
-                # targets from current policy (old policy = buffer)
-                # policy_actions_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_observations[idx])
-                
-                # target q values
-                q1_policy_targ = self.critics1_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
-                q2_policy_targ = self.critics2_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
-                # clipped double Q trick
-                q_targ = torch.min(q1_policy_targ, q2_policy_targ)
-                # Bellman approximation
-                bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx].detach() * log_prob_next_obs[agent_idx])
-            
-            # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-                # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
-            loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-            loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-            loss_critic = loss_critic1 + loss_critic2
+            # critic loss
+            loss_critic = self.criticLoss(self.actors[agent_idx], self.critics1[agent_idx], self.critics2[agent_idx],
+                                          self.critics1_targ[agent_idx], self.critics2_targ[agent_idx], 
+                                          self.alphas[agent_idx], obs_set, replay_act_set, next_obs_set, dones, rewards)
 
             # backward prop
             loss_critic.backward()
@@ -234,18 +220,13 @@ class Agents:
             for params in self.critics2[agent_idx].parameters():
                 params.requires_grad = False
 
-            # compute Q-values
-            # for this we need set of actions of all agents, where the gradient graph only
+            # compute policy loss
+            #   for this we need set of actions of all agents, where the gradient graph only
             #   persists of the action of the current actor
             action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
                             in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            q1_policy = self.critics1[agent_idx].forward(obs_set, action_set)
-            q2_policy = self.critics2[agent_idx].forward(obs_set, action_set)
-            # take min of these two 
-            #   = clipped Q-value for stable learning, reduces overestimation
-            q_policy = torch.min(q1_policy, q2_policy)
-            # entropy regularized loss
-            loss_policy = (self.alphas[agent_idx].detach() * log_prob_prev_obs[agent_idx] - q_policy).mean()
+            loss_policy = self.actorLoss(self.actor[agent_idx], self.critics1[agent_idx], self.critics2[agent_idx],
+                                         self.alphas[agent_idx], obs_set, action_set, log_prob_next_obs)
 
             # backward prop
             loss_policy.backward()
@@ -323,7 +304,7 @@ class Agents:
         ep_alphaloss_sum = np.zeros(self.nr_agents)
         ep_entr_sum = np.zeros(self.nr_agents)
 
-        for step in (pbar := tqdm(range(nr_steps))):
+        for step in range(nr_steps):
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = [act_space.sample() for act_space in self.env.action_space]
@@ -373,7 +354,8 @@ class Agents:
                     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                pbar.set_description("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
+                if (ep % 50 == 0):
+                    print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                 # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
                 # reset
