@@ -225,8 +225,9 @@ class Agents(SAC):
             #   persists of the action of the current actor
             action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
                             in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            loss_policy = self.actorLoss(self.actor[agent_idx], self.critics1[agent_idx], self.critics2[agent_idx],
-                                         self.alphas[agent_idx], obs_set, action_set, log_prob_next_obs)
+            loss_policy = self.actorLoss(self.critics1[agent_idx], self.critics2[agent_idx],
+                                         self.alphas[agent_idx], obs_set, action_set, 
+                                         log_prob_next_obs[agent_idx])
 
             # backward prop
             loss_policy.backward()

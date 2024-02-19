@@ -36,7 +36,7 @@ class SAC():
         
         return loss
     
-    def actorLoss(self, actor, critic1, critic2, alpha, obs, policy_act_prev_obs, log_prob_prev_obs):
+    def actorLoss(self, critic1, critic2, alpha, obs, policy_act_prev_obs, log_prob_prev_obs):
         # compute Q-values
         q1_policy = critic1.forward(obs, policy_act_prev_obs)
         q2_policy = critic2.forward(obs, policy_act_prev_obs)
