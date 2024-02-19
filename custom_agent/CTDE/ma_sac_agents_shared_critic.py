@@ -111,7 +111,7 @@ class Agents:
         for act_space in self.env.action_space:
             self.entropy_targs.append(torch.tensor(-np.prod(act_space.shape[0]), dtype=torch.float32).to(self.device))
             # the entropy coef alpha which is to be optimized
-            self.alphas.append(torch.ones(1, requires_grad = True, device = self.device))
+            self.alphas.append(torch.ones(1, requires_grad = True).to(self.device))
             self.alpha_optimizers.append(torch.optim.Adam([self.alphas[-1]], lr = lr_critic))   # shares critic lr
 
     def learn(self):
@@ -182,7 +182,7 @@ class Agents:
         #   which also raises an error fortunately, otherwise I would have missed this
         for agent_idx in range(self.nr_agents):
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
+            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()   
 

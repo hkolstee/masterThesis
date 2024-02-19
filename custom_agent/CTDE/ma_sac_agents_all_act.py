@@ -24,13 +24,12 @@ from ..SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
 from ..SAC_components.critic import Critic
 from ..SAC_components.actor import Actor
 from ..SAC_components.logger import Logger
-from ..SAC_components.sac import SAC
 
 from copy import deepcopy
 
 from tqdm import tqdm
 
-class Agents(SAC):
+class Agents:
     """
     Multi-agent Soft Actor-Critic centralized training decentralized execution agents.
     The critics are centralized, while the actors are decentralized.
@@ -62,8 +61,6 @@ class Agents(SAC):
         self.polyak = polyak
         self.batch_size = batch_size
         self.nr_agents = len(env.action_space)
-        # init super sac gradient func class
-        super().__init__(gamma)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -119,7 +116,7 @@ class Agents(SAC):
         for act_space in self.env.action_space:
             self.entropy_targs.append(torch.tensor(-np.prod(act_space.shape[0]), dtype=torch.float32).to(self.device))
             # the entropy coef alpha which is to be optimized
-            self.alphas.append(torch.ones(1, requires_grad = True, device = self.device))
+            self.alphas.append(torch.ones(1, requires_grad = True).to(self.device))
             self.alpha_optimizers.append(torch.optim.Adam([self.alphas[-1]], lr = lr_critic))   # shares critic lr
 
     def learn(self):
@@ -174,7 +171,6 @@ class Agents(SAC):
             policy_act_next_obs, log_prob_next_obs = \
                 zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_obs)])
             policy_act_next_obs_set = torch.cat(policy_act_next_obs, axis = 1)
-        
 
         # set actor gradients to zero
         for actor in self.actors:
@@ -192,8 +188,7 @@ class Agents(SAC):
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
             self.alpha_optimizers[agent_idx].zero_grad()
-            # alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
-            alpha_loss = self.alphaLoss(self.alphas[agent_idx], log_prob_prev_obs[agent_idx], self.entropy_targs[agent_idx])
+            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()   
 
@@ -202,10 +197,25 @@ class Agents(SAC):
             self.critics1[agent_idx].optimizer.zero_grad()
             self.critics2[agent_idx].optimizer.zero_grad()
             
-            # critic loss
-            loss_critic = self.criticLoss(self.actors[agent_idx], self.critics1[agent_idx], self.critics2[agent_idx],
-                                          self.critics1_targ[agent_idx], self.critics2_targ[agent_idx], 
-                                          self.alphas[agent_idx], obs_set, replay_act_set, next_obs_set, dones, rewards)
+            # These Q values are the left hand side of the loss function
+            q1_buffer = self.critics1[agent_idx].forward(obs_set, replay_act_set)
+            q2_buffer = self.critics2[agent_idx].forward(obs_set, replay_act_set)
+            
+            # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
+            with torch.no_grad():
+                # target q values
+                q1_policy_targ = self.critics1_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
+                q2_policy_targ = self.critics2_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
+                # clipped double Q trick
+                q_targ = torch.min(q1_policy_targ, q2_policy_targ)
+                # Bellman approximation
+                bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx].detach() * log_prob_next_obs[agent_idx])
+            
+            # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
+                # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
+            loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
+            loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+            loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
             # backward prop
             loss_critic.backward()
@@ -220,14 +230,18 @@ class Agents(SAC):
             for params in self.critics2[agent_idx].parameters():
                 params.requires_grad = False
 
-            # compute policy loss
-            #   for this we need set of actions of all agents, where the gradient graph only
+            # compute Q-values
+            # for this we need set of actions of all agents, where the gradient graph only
             #   persists of the action of the current actor
             action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
                             in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            loss_policy = self.actorLoss(self.critics1[agent_idx], self.critics2[agent_idx],
-                                         self.alphas[agent_idx], obs_set, action_set, 
-                                         log_prob_next_obs[agent_idx])
+            q1_policy = self.critics1[agent_idx].forward(obs_set, action_set)
+            q2_policy = self.critics2[agent_idx].forward(obs_set, action_set)
+            # take min of these two 
+            #   = clipped Q-value for stable learning, reduces overestimation
+            q_policy = torch.min(q1_policy, q2_policy)
+            # entropy regularized loss
+            loss_policy = (self.alphas[agent_idx].detach() * log_prob_prev_obs[agent_idx] - q_policy).mean()
 
             # backward prop
             loss_policy.backward()
@@ -315,7 +329,6 @@ class Agents(SAC):
 
             # transition
             next_obs, reward, done, info = self.env.step(action)
-            # print(reward)
             
             # step increment 
             ep_steps += 1

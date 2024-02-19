@@ -124,6 +124,21 @@ class Agent:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
+        # reset actor gradient
+        self.actor.optimizer.zero_grad()
+
+        # compute current policy action for pre-transition observation
+        policy_actions_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+
+        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        self.alpha_optimizer.zero_grad()
+        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).detach().mean()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()   
+
         # CRITIC GRADIENT
         # reset gradients
         self.critic1.optimizer.zero_grad()
@@ -144,7 +159,7 @@ class Agent:
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
+            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha.detach() * log_prob_next_obs)
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
@@ -164,11 +179,6 @@ class Agent:
         for params in self.critic2.parameters():
             params.requires_grad = False
 
-        # reset actor gradient
-        self.actor.optimizer.zero_grad()
-
-        # compute current policy action for pre-transition observation
-        policy_actions_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
         # compute Q-values
         q1_policy = self.critic1.forward(obs, policy_actions_prev_obs)
         q2_policy = self.critic2.forward(obs, policy_actions_prev_obs)
@@ -176,7 +186,7 @@ class Agent:
         #   = clipped Q-value for stable learning, reduces overestimation
         q_policy = torch.min(q1_policy, q2_policy)
         # entropy regularized loss
-        loss_policy = (self.alpha * log_prob_prev_obs - q_policy).mean()
+        loss_policy = (self.alpha.detach() * log_prob_prev_obs - q_policy).mean()
 
         # backward prop
         loss_policy.backward()
@@ -187,16 +197,7 @@ class Agent:
         for params in self.critic1.parameters():
             params.requires_grad = True
         for params in self.critic2.parameters():
-            params.requires_grad = True
-
-        # LAST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-        self.alpha_optimizer.zero_grad()
-        # we detach because otherwise we backward through the graph of previous calculations using log_prob
-        #   which also raises an error fortunately, otherwise I would have missed this
-        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).mean()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()            
+            params.requires_grad = True         
 
         # Polyak averaging update
         with torch.no_grad():
@@ -257,7 +258,7 @@ class Agent:
         ep_alphaloss_sum = 0
         ep_entr_sum = 0
         
-        for step in (pbar := tqdm(range(nr_steps))):
+        for step in range(nr_steps):
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = self.env.action_space.sample()
@@ -306,7 +307,8 @@ class Agent:
                     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                pbar.set_description("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
+                if (ep % 50 == 0):
+                    print("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
                 
                 # reset
                 obs, info = self.env.reset()

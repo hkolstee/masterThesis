@@ -163,7 +163,8 @@ class Agents:
         with torch.no_grad():
             policy_act_next_obs, log_prob_next_obs = \
                 zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_obs)])
-    
+        
+        # reset actor gradients
         for actor in self.actors:
             actor.optimizer.zero_grad()    
         
@@ -177,7 +178,7 @@ class Agents:
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
             self.alpha_optimizers[idx].zero_grad()
-            alpha_loss = (-self.alphas[idx] * log_prob_prev_obs[idx].detach() - self.alphas[idx] * self.entropy_targs[idx]).detach().mean()
+            alpha_loss = (-self.alphas[idx] * log_prob_prev_obs[idx].detach() - self.alphas[idx] * self.entropy_targs[idx]).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()   
 
@@ -221,9 +222,6 @@ class Agents:
                 params.requires_grad = False
             for params in self.critics2[idx].parameters():
                 params.requires_grad = False
-
-            # reset actor gradient
-            # self.actor.optimizer.zero_grad()
 
             # compute current policy action for pre-transition observation
             # policy_actions_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(observations[idx])
