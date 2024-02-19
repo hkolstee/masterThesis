@@ -167,108 +167,108 @@ class Agents:
                 zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_observations)])
             policy_act_next_obs_set = torch.cat(policy_act_next_obs, axis = 1)
         
-        with torch.autograd.set_detect_anomaly(True):
-            for actor in self.actors:
-                actor.optimizer.zero_grad()    
-            
-            # with grad 
-            policy_act_prev_obs, log_prob_prev_obs = \
-                zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, observations)])
-            # create entire set, without grad
-            policy_act_prev_obs_nograd = [act.detach() for act in policy_act_prev_obs]
+        for actor in self.actors:
+            actor.optimizer.zero_grad()    
+        
+        # with grad 
+        policy_act_prev_obs, log_prob_prev_obs = \
+            zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, observations)])
+        # create entire set, without grad
+        policy_act_prev_obs_nograd = [act.detach() for act in policy_act_prev_obs]
 
-            # CRITIC GRADIENT
-            # reset gradients
-            self.critic1.optimizer.zero_grad()
-            self.critic2.optimizer.zero_grad()
-            
-            # These Q values are the left hand side of the loss function
-            q1_buffer = self.critic1.forward(obs_set, replay_act_set)
-            q2_buffer = self.critic2.forward(obs_set, replay_act_set)
-            
-            # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
-            with torch.no_grad():
-                # target q values
-                q1_policy_targ = self.critic1_targ.forward(next_obs_set, policy_act_next_obs_set)
-                q2_policy_targ = self.critic2_targ.forward(next_obs_set, policy_act_next_obs_set)
-                # clipped double Q trick
-                q_targ = torch.min(q1_policy_targ, q2_policy_targ)
-                # Bellman approximation
-                # bellman = torch.mean(torch.tensor(rewards) + self.gamma * (1 - torch.tensor(dones)) * (q_targ - torch.tensor(self.alphas) * torch.tensor(log_prob_next_obs)))
-                bellman = np.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)])
-            
-            # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-            loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-            loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-            loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        for agent_idx in range(self.nr_agents):
+            self.alpha_optimizers[agent_idx].zero_grad()
+            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
+            alpha_loss.backward()
+            self.alpha_optimizer.step()   
+
+        # CRITIC GRADIENT
+        # reset gradients
+        self.critic1.optimizer.zero_grad()
+        self.critic2.optimizer.zero_grad()
+        
+        # These Q values are the left hand side of the loss function
+        q1_buffer = self.critic1.forward(obs_set, replay_act_set)
+        q2_buffer = self.critic2.forward(obs_set, replay_act_set)
+        
+        # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
+        with torch.no_grad():
+            # target q values
+            q1_policy_targ = self.critic1_targ.forward(next_obs_set, policy_act_next_obs_set)
+            q2_policy_targ = self.critic2_targ.forward(next_obs_set, policy_act_next_obs_set)
+            # clipped double Q trick
+            q_targ = torch.min(q1_policy_targ, q2_policy_targ)
+            # Bellman approximation
+            # bellman = torch.mean(torch.tensor(rewards) + self.gamma * (1 - torch.tensor(dones)) * (q_targ - torch.tensor(self.alphas) * torch.tensor(log_prob_next_obs)))
+            bellman = np.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx].detach() * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)])
+        
+        # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
+        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
+        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+
+        # backward prop
+        loss_critic.backward()
+        # step down gradient
+        self.critic1.optimizer.step()
+        self.critic2.optimizer.step()
+        
+        for agent_idx in range(self.nr_agents):
+            # ACTOR GRADIENT
+            # first freeze critic gradient calculation to save computation
+            for params in self.critic1.parameters():
+                params.requires_grad = False
+            for params in self.critic2.parameters():
+                params.requires_grad = False
+
+            # compute Q-values
+            # for this we need set of actions of all agents, where the gradient graph only
+            #   persists of the action of the current actor
+            action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
+                            in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
+            q1_policy = self.critic1.forward(obs_set, action_set)
+            q2_policy = self.critic2.forward(obs_set, action_set)
+            # take min of these two 
+            #   = clipped Q-value for stable learning, reduces overestimation
+            q_policy = torch.min(q1_policy, q2_policy)
+            # entropy regularized loss
+            loss_policy = (self.alphas[agent_idx].detach() * log_prob_prev_obs[agent_idx] - q_policy).mean()
 
             # backward prop
-            loss_critic.backward()
+            loss_policy.backward()
             # step down gradient
-            self.critic1.optimizer.step()
-            self.critic2.optimizer.step()
+            self.actors[agent_idx].optimizer.step()
+
+            # unfreeze critic gradients
+            for params in self.critic1.parameters():
+                params.requires_grad = True
+            for params in self.critic2.parameters():
+                params.requires_grad = True     
+
+            # Polyak averaging update
+            with torch.no_grad():
+                for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
+                                                    self.critic2.parameters(),
+                                                    self.critic1_targ.parameters(),
+                                                    self.critic2_targ.parameters()):
+                    # critic1
+                    p1_targ.data *= self.polyak
+                    p1_targ.data += ((1 - self.polyak) * p1.data)
+                    # critic2
+                    p2_targ.data *= self.polyak
+                    p2_targ.data += ((1 - self.polyak) * p2.data)
             
-            for agent_idx in range(self.nr_agents):
-                # ACTOR GRADIENT
-                # first freeze critic gradient calculation to save computation
-                for params in self.critic1.parameters():
-                    params.requires_grad = False
-                for params in self.critic2.parameters():
-                    params.requires_grad = False
-
-                # compute Q-values
-                # for this we need set of actions of all agents, where the gradient graph only
-                #   persists of the action of the current actor
-                action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
-                              in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-                q1_policy = self.critic1.forward(obs_set, action_set)
-                q2_policy = self.critic2.forward(obs_set, action_set)
-                # take min of these two 
-                #   = clipped Q-value for stable learning, reduces overestimation
-                q_policy = torch.min(q1_policy, q2_policy)
-                # entropy regularized loss
-                loss_policy = (self.alphas[agent_idx] * log_prob_prev_obs[agent_idx] - q_policy).mean()
-
-                # backward prop
-                loss_policy.backward()
-                # step down gradient
-                self.actors[agent_idx].optimizer.step()
-
-                # unfreeze critic gradients
-                for params in self.critic1.parameters():
-                    params.requires_grad = True
-                for params in self.critic2.parameters():
-                    params.requires_grad = True
-
-                # LAST GRADIENT: automatic entropy coefficient tuning (alpha)
-                #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-                self.alpha_optimizers[agent_idx].zero_grad()
-                # we detach because otherwise we backward through the graph of previous calculations using log_prob
-                #   which also raises an error fortunately, otherwise I would have missed this
-                alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).mean()
-                alpha_loss.backward()
-                self.alpha_optimizers[agent_idx].step()            
-
-                # Polyak averaging update
-                with torch.no_grad():
-                    for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
-                                                        self.critic2.parameters(),
-                                                        self.critic1_targ.parameters(),
-                                                        self.critic2_targ.parameters()):
-                        # critic1
-                        p1_targ.data *= self.polyak
-                        p1_targ.data += ((1 - self.polyak) * p1.data)
-                        # critic2
-                        p2_targ.data *= self.polyak
-                        p2_targ.data += ((1 - self.polyak) * p2.data)
-                
-                # log each agent's values
-                loss_policy_list.append(loss_policy.cpu().detach().numpy())
-                log_prob_list.append(log_prob_prev_obs[agent_idx].cpu().detach().numpy().mean())
-                alpha_list.append(self.alphas[agent_idx].cpu().detach().numpy()[0])
-                alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
-            # log critic loss
-            loss_critic_list.append(loss_critic.cpu().detach().numpy())
+            # log each agent's values
+            loss_policy_list.append(loss_policy.cpu().detach().numpy())
+            log_prob_list.append(log_prob_prev_obs[agent_idx].cpu().detach().numpy().mean())
+            alpha_list.append(self.alphas[agent_idx].cpu().detach().numpy()[0])
+            alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
+        # log critic loss
+        loss_critic_list.append(loss_critic.cpu().detach().numpy())
             
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, np.array(loss_policy_list), np.array(loss_critic_list), np.array(log_prob_list), np.array(alpha_list), np.array(alpha_loss_list)
