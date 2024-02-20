@@ -85,9 +85,6 @@ class Agent:
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
 
-        # initialize autoencoder
-        self.autoencoder = AutoEncoder(env.observation_space.shape[0], 6)
-
         # target entropy for automatic entropy coefficient adjustment
         self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
         # the entropy coef alpha which is to be optimized
@@ -227,7 +224,8 @@ class Agent:
 
     def get_action(self, obs, reparameterize = False, deterministic = False):
         # make tensor and send to device
-        # obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
@@ -235,7 +233,7 @@ class Agent:
 
         return actions.cpu().detach().numpy()[0]
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
         """Train the SAC agent.
 
         Args:
@@ -268,12 +266,8 @@ class Agent:
             if step < warmup_steps:
                 action = self.env.action_space.sample()
             else: 
-                # get 
-                # print(obs.shape)
-                obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
-                latent_obs, _ = self.autoencoder(obs)
-                # print(obs.shape, latent_obs.shape)
-                action = self.get_action(latent_obs)
+                # get action
+                action = self.get_action(obs)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(action)
@@ -345,3 +339,11 @@ class Agent:
                         ep_entr_sum += policy_entropy
                         ep_alpha_sum += alpha
                         ep_alphaloss_sum += loss_alpha
+                        
+            # checkpoint
+            if (step % checkpoint == 0):
+                self.actor.save("models", "actor" + "_" + str(step))
+                self.critic1.save("models", "critic1" + "_" + str(step))
+                self.critic2.save("models", "critic2" + "_" + str(step))
+                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))
