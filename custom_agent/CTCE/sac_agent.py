@@ -89,7 +89,7 @@ class Agent:
         self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
         # the entropy coef alpha which is to be optimized
         self.log_alpha = torch.ones(1, requires_grad = True).to(self.device)
-        self.alpha_optimizer = torch.optim.Adam([self.alpha], lr = lr_critic)   # shares critic lr
+        self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
