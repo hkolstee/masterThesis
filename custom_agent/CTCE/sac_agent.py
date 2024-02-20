@@ -125,21 +125,6 @@ class Agent:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
-        # reset actor gradient
-        self.actor.optimizer.zero_grad()
-
-        # compute current policy action for pre-transition observation
-        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
-
-        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-        # we detach because otherwise we backward through the graph of previous calculations using log_prob
-        #   which also raises an error fortunately, otherwise I would have missed this
-        self.alpha_optimizer.zero_grad()
-        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).mean()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()   
-
         # CRITIC GRADIENT
         # reset gradients
         self.critic1.optimizer.zero_grad()
@@ -181,6 +166,12 @@ class Agent:
         for params in self.critic2.parameters():
             params.requires_grad = False
 
+        # reset actor gradient
+        self.actor.optimizer.zero_grad()
+
+        # compute current policy action for pre-transition observation
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+
         # compute Q-values
         q1_policy = self.critic1.forward(obs, policy_act_prev_obs)
         q2_policy = self.critic2.forward(obs, policy_act_prev_obs)
@@ -200,6 +191,15 @@ class Agent:
             params.requires_grad = True
         for params in self.critic2.parameters():
             params.requires_grad = True         
+
+        # LAST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        self.alpha_optimizer.zero_grad()
+        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).mean()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()   
 
         # Polyak averaging update
         with torch.no_grad():
