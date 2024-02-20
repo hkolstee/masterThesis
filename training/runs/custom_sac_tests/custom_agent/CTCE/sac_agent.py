@@ -21,6 +21,7 @@ from ..SAC_components.replay_buffer import ReplayBuffer
 from ..SAC_components.critic import Critic
 from ..SAC_components.actor import Actor
 from ..SAC_components.logger import Logger
+from ..SAC_components.autoencoder import AutoEncoder
 
 from copy import deepcopy
 
@@ -69,7 +70,7 @@ class Agent:
 
         # initialize replay buffer
         self.replay_buffer = ReplayBuffer(buffer_max_size, env.observation_space.shape, env.action_space.shape, batch_size)
-        
+
         # initialize networks
         self.actor = Actor(lr_actor, env.observation_space.shape[0], env.action_space.shape[0], env.action_space.low, env.action_space.high, layer_sizes)
         self.critic1 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
@@ -83,6 +84,9 @@ class Agent:
             params.requires_grad = False
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
+
+        # initialize autoencoder
+        self.autoencoder = AutoEncoder(env.observation_space.shape[0], 6)
 
         # target entropy for automatic entropy coefficient adjustment
         self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
@@ -115,12 +119,12 @@ class Agent:
             return 0, None, None, None, None, None
         
         # sample from buffer
-        obs, replay_actions, rewards, next_obs, dones = self.replay_buffer.sample()
+        obs, replay_act, rewards, next_obs, dones = self.replay_buffer.sample()
 
         # prepare tensors
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         next_obs = torch.tensor(next_obs, dtype=torch.float32).to(self.device)
-        replay_actions = torch.tensor(replay_actions, dtype=torch.float32).to(self.device)
+        replay_act = torch.tensor(replay_act, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
@@ -128,14 +132,14 @@ class Agent:
         self.actor.optimizer.zero_grad()
 
         # compute current policy action for pre-transition observation
-        policy_actions_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
 
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
         #   which also raises an error fortunately, otherwise I would have missed this
         self.alpha_optimizer.zero_grad()
-        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).detach().mean()
+        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).mean()
         alpha_loss.backward()
         self.alpha_optimizer.step()   
 
@@ -145,17 +149,18 @@ class Agent:
         self.critic2.optimizer.zero_grad()
         
         # These Q values are the left hand side of the loss function
-        q1_buffer = self.critic1.forward(obs, replay_actions)
-        q2_buffer = self.critic2.forward(obs, replay_actions)
+        q1_buffer = self.critic1.forward(obs, replay_act)
+        q2_buffer = self.critic2.forward(obs, replay_act)
         
         # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
         with torch.no_grad():
             # targets from current policy (old policy = buffer)
-            policy_actions_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
+            policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
+            # policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
 
             # target q values
-            q1_policy_targ = self.critic1_targ.forward(next_obs, policy_actions_next_obs)
-            q2_policy_targ = self.critic2_targ.forward(next_obs, policy_actions_next_obs)
+            q1_policy_targ = self.critic1_targ.forward(next_obs, policy_act_next_obs)
+            q2_policy_targ = self.critic2_targ.forward(next_obs, policy_act_next_obs)
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
@@ -180,8 +185,8 @@ class Agent:
             params.requires_grad = False
 
         # compute Q-values
-        q1_policy = self.critic1.forward(obs, policy_actions_prev_obs)
-        q2_policy = self.critic2.forward(obs, policy_actions_prev_obs)
+        q1_policy = self.critic1.forward(obs, policy_act_prev_obs)
+        q2_policy = self.critic2.forward(obs, policy_act_prev_obs)
         # take min of these two 
         #   = clipped Q-value for stable learning, reduces overestimation
         q_policy = torch.min(q1_policy, q2_policy)
@@ -222,7 +227,7 @@ class Agent:
 
     def get_action(self, obs, reparameterize = False, deterministic = False):
         # make tensor and send to device
-        obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+        # obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
@@ -263,8 +268,12 @@ class Agent:
             if step < warmup_steps:
                 action = self.env.action_space.sample()
             else: 
-                # get action
-                action = self.get_action(obs)
+                # get 
+                # print(obs.shape)
+                obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+                latent_obs, _ = self.autoencoder(obs)
+                # print(obs.shape, latent_obs.shape)
+                action = self.get_action(latent_obs)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(action)

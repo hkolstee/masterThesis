@@ -182,7 +182,7 @@ class Agents:
         #   which also raises an error fortunately, otherwise I would have missed this
         for agent_idx in range(self.nr_agents):
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).detach().mean()
+            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).mean()
             alpha_loss.backward()
             self.alpha_optimizer.step()   
 

@@ -1,21 +1,15 @@
-MEETING NOTES 13/02
+MEETING NOTES 20/02
 
-First note:
-CityLearn 2023 winners, not much RL. For the competition, they changed the environment to not include crucial information
-in the reward calculation, which is available in the current normal version of citylearn, such as how much energy from 
-storage was used. Therefore, it makes sense that this has to be modelled to gain this critical information. I think this 
-is the reason that we don't see model-free RL winners. 
+Made some changes to my SAC while comparing to SB3, did not see much change.
+I think one change they use which might help still is batch normalization for critics.
 
-Implemented: 
-- SAC, most modern implementation (no value networks, automatic entropy tuning)
-- MASAC, 1: one set of critics for each agent, one global set of critics, critics take global observations and actions
-- Ensemble method
+Added autoencoder, no dropout, the one training run does not proof to work well yet.
 
-To implement based on ensemble paper/presentation:
-- Autoencoder
-- Add Diversity via Determinants component to actor loss function during training to promote diversity in policies
+Found in literature about centralized critics:
+    - MADDPG (https://arxiv.org/abs/1706.02275v4) (2017) uses a centralized critic for each agent in a multi-agent DDPG algorithm
+    - Found some applications of centralized critics.
+        - https://www.researchgate.net/publication/344036373_Multi-Agent_Reinforcement_Learning_for_the_Energy_Optimization_of_Cyber-Physical_Production_Systems
 
-Questions:
-1. The complexity of the Multi-Agent SAC implementation grows linearly with number of agents when using same layer sizes,
-    what should I do?
+Would like to continue with the setting where new agents might be added.
 
+Also found paper that uses multi-headed output as ensemble, might be interesting to couple this with some diversity promoting addition to loss (Diversity via Determinants)

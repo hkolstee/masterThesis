@@ -130,7 +130,7 @@ class MultiLayerPerceptron(nn.Module):
         Args:
             file_path (str): Directory of file to load.
         """
-        self.load_state_dict(torch.load(file_path))
+        self.load_state_dict(torch.load(file_path, map_location=torch.device('cpu')))
 
     def load_checkpoint(self, checkpoint_file_path):
         """Load model weights along with checkpoint information.
@@ -143,7 +143,7 @@ class MultiLayerPerceptron(nn.Module):
             step (int): Step at checkpoint.
         """
         # load checkpoint dict
-        checkpoint = torch.load(checkpoint_file_path)
+        checkpoint = torch.load(checkpoint_file_path, map_location=torch.device('cpu'))
         # load model
         self.load_state_dict(checkpoint["model_state_dict"])
         # load optimizer
