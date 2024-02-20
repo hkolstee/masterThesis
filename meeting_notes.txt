@@ -10,6 +10,10 @@ Found in literature about centralized critics:
     - Found some applications of centralized critics.
         - https://www.researchgate.net/publication/344036373_Multi-Agent_Reinforcement_Learning_for_the_Energy_Optimization_of_Cyber-Physical_Production_Systems
 
-Would like to continue with the setting where new agents might be added.
 
-Also found paper that uses multi-headed output as ensemble, might be interesting to couple this with some diversity promoting addition to loss (Diversity via Determinants)
+-> look at MADDPG (baseline) (decide value is factorized (one per agent))
+-> meeting on multi-agent reinforcement learning algorithms
+-> COMA, MADDPG, VDN, QMIX, 
+-> launch benchmarks
+-> literature research, classification in attributes of algos, how are they different, pros cons, etc
+
