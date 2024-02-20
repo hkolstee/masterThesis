@@ -208,11 +208,17 @@ class Agent:
                                                   self.critic1_targ.parameters(),
                                                   self.critic2_targ.parameters()):
                 # critic1
-                p1_targ.data *= self.polyak
-                p1_targ.data += ((1 - self.polyak) * p1.data)
+                p1_targ.data.mul_(self.polyak)
+                p1_targ.data.add_((1 - self.polyak) * p1.data)
                 # critic2
-                p2_targ.data *= self.polyak
-                p2_targ.data += ((1 - self.polyak) * p2.data)
+                p2_targ.data.mul_(self.polyak)
+                p2_targ.data.add_((1 - self.polyak) * p2.data)
+                # # critic1
+                # p1_targ.data *= self.polyak
+                # p1_targ.data += ((1 - self.polyak) * p1.data)
+                # # critic2
+                # p2_targ.data *= self.polyak
+                # p2_targ.data += ((1 - self.polyak) * p2.data)
         
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, \
