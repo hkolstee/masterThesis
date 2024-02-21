@@ -111,13 +111,13 @@ class Agents:
         # target entropy for automatic entropy coefficient adjustment, one per actor
                 # not pytorch modules, so a normal list
         self.entropy_targs = []
-        self.alphas = []
+        self.log_alphas = []
         self.alpha_optimizers = []
         for act_space in self.env.action_space:
             self.entropy_targs.append(torch.tensor(-np.prod(act_space.shape[0]), dtype=torch.float32).to(self.device))
             # the entropy coef alpha which is to be optimized
-            self.alphas.append(torch.ones(1, requires_grad = True).to(self.device))
-            self.alpha_optimizers.append(torch.optim.Adam([self.alphas[-1]], lr = lr_critic))   # shares critic lr
+            self.log_alphas.append(torch.ones(1, requires_grad = True, device = self.device))   # device this way otherwise leaf tensor
+            self.alpha_optimizers.append(torch.optim.Adam([self.log_alphas[-1]], lr = lr_critic))   # shares critic lr
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -181,6 +181,7 @@ class Agents:
             zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, obs)])
         # create entire set, without grad
         policy_act_prev_obs_nograd = [act.detach() for act in policy_act_prev_obs]
+
         
         for agent_idx in range(self.nr_agents):
             # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
@@ -188,9 +189,12 @@ class Agents:
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = (-self.alphas[agent_idx] * log_prob_prev_obs[agent_idx].detach() - self.alphas[agent_idx] * self.entropy_targs[agent_idx]).mean()
+            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
             alpha_loss.backward()
-            self.alpha_optimizer.step()   
+            self.alpha_optimizers[agent_idx].step()   
+
+            # get current alpha
+            alpha = torch.exp(self.log_alphas[agent_idx].detach())
 
             # CRITIC GRADIENT
             # reset gradients
@@ -209,7 +213,7 @@ class Agents:
                 # clipped double Q trick
                 q_targ = torch.min(q1_policy_targ, q2_policy_targ)
                 # Bellman approximation
-                bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - self.alphas[agent_idx].detach() * log_prob_next_obs[agent_idx])
+                bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alpha * log_prob_next_obs[agent_idx])
             
             # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
                 # NOTE: SOME IMPLEMENTATIONS USE "0.5 *" FOR EACH, IDK WHAT IS BEST 
@@ -241,7 +245,7 @@ class Agents:
             #   = clipped Q-value for stable learning, reduces overestimation
             q_policy = torch.min(q1_policy, q2_policy)
             # entropy regularized loss
-            loss_policy = (self.alphas[agent_idx].detach() * log_prob_prev_obs[agent_idx] - q_policy).mean()
+            loss_policy = (alpha * log_prob_prev_obs[agent_idx] - q_policy).mean()
 
             # backward prop
             loss_policy.backward()
@@ -271,7 +275,7 @@ class Agents:
             loss_policy_list.append(loss_policy.cpu().detach().numpy())
             loss_critic_list.append(loss_critic.cpu().detach().numpy())
             log_prob_list.append(log_prob_prev_obs[agent_idx].cpu().detach().numpy().mean())
-            alpha_list.append(self.alphas[agent_idx].cpu().detach().numpy()[0])
+            alpha_list.append(alpha.cpu().detach().numpy()[0])
             alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
             
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
