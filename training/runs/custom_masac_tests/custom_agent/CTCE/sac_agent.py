@@ -85,14 +85,12 @@ class Agent:
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
 
-        # initialize autoencoder
-        self.autoencoder = AutoEncoder(env.observation_space.shape[0], 6)
-
         # target entropy for automatic entropy coefficient adjustment
         self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
         # the entropy coef alpha which is to be optimized
-        self.alpha = torch.ones(1, requires_grad = True, device = self.device)
-        self.alpha_optimizer = torch.optim.Adam([self.alpha], lr = lr_critic)   # shares critic lr
+        self.log_alpha = torch.ones(1, requires_grad = True).to(self.device)
+        self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
+        self.alpha = torch.exp(self.log_alpha.detach())
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -128,26 +126,7 @@ class Agent:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
-        # reset actor gradient
-        self.actor.optimizer.zero_grad()
-
-        # compute current policy action for pre-transition observation
-        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
-
-        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-        # we detach because otherwise we backward through the graph of previous calculations using log_prob
-        #   which also raises an error fortunately, otherwise I would have missed this
-        self.alpha_optimizer.zero_grad()
-        alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).mean()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()   
-
         # CRITIC GRADIENT
-        # reset gradients
-        self.critic1.optimizer.zero_grad()
-        self.critic2.optimizer.zero_grad()
-        
         # These Q values are the left hand side of the loss function
         q1_buffer = self.critic1.forward(obs, replay_act)
         q2_buffer = self.critic2.forward(obs, replay_act)
@@ -164,16 +143,17 @@ class Agent:
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha.detach() * log_prob_next_obs)
+            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
         loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
         loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
-        # backward prop
+        # backward prop + gradient step
+        self.critic1.optimizer.zero_grad()
+        self.critic2.optimizer.zero_grad()
         loss_critic.backward()
-        # step down gradient
         self.critic1.optimizer.step()
         self.critic2.optimizer.step()
 
@@ -184,6 +164,9 @@ class Agent:
         for params in self.critic2.parameters():
             params.requires_grad = False
 
+        # compute current policy action for pre-transition observation
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+
         # compute Q-values
         q1_policy = self.critic1.forward(obs, policy_act_prev_obs)
         q2_policy = self.critic2.forward(obs, policy_act_prev_obs)
@@ -191,11 +174,11 @@ class Agent:
         #   = clipped Q-value for stable learning, reduces overestimation
         q_policy = torch.min(q1_policy, q2_policy)
         # entropy regularized loss
-        loss_policy = (self.alpha.detach() * log_prob_prev_obs - q_policy).mean()
+        loss_policy = (self.alpha * log_prob_prev_obs - q_policy).mean()
 
-        # backward prop
+        # backward prop + gradient step
+        self.actor.optimizer.zero_grad()
         loss_policy.backward()
-        # step down gradient
         self.actor.optimizer.step()
 
         # unfreeze critic gradients
@@ -204,6 +187,20 @@ class Agent:
         for params in self.critic2.parameters():
             params.requires_grad = True         
 
+        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+        
+        # backward prop + gradient step
+        self.alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()   
+
+        # get next alpha
+        self.alpha = torch.exp(self.log_alpha.detach())
+
         # Polyak averaging update
         with torch.no_grad():
             for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
@@ -211,11 +208,17 @@ class Agent:
                                                   self.critic1_targ.parameters(),
                                                   self.critic2_targ.parameters()):
                 # critic1
-                p1_targ.data *= self.polyak
-                p1_targ.data += ((1 - self.polyak) * p1.data)
+                p1_targ.data.mul_(self.polyak)
+                p1_targ.data.add_((1 - self.polyak) * p1.data)
                 # critic2
-                p2_targ.data *= self.polyak
-                p2_targ.data += ((1 - self.polyak) * p2.data)
+                p2_targ.data.mul_(self.polyak)
+                p2_targ.data.add_((1 - self.polyak) * p2.data)
+                # # critic1
+                # p1_targ.data *= self.polyak
+                # p1_targ.data += ((1 - self.polyak) * p1.data)
+                # # critic2
+                # p2_targ.data *= self.polyak
+                # p2_targ.data += ((1 - self.polyak) * p2.data)
         
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, \
@@ -227,7 +230,8 @@ class Agent:
 
     def get_action(self, obs, reparameterize = False, deterministic = False):
         # make tensor and send to device
-        # obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
@@ -235,7 +239,7 @@ class Agent:
 
         return actions.cpu().detach().numpy()[0]
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
         """Train the SAC agent.
 
         Args:
@@ -268,12 +272,8 @@ class Agent:
             if step < warmup_steps:
                 action = self.env.action_space.sample()
             else: 
-                # get 
-                # print(obs.shape)
-                obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
-                latent_obs, _ = self.autoencoder(obs)
-                # print(obs.shape, latent_obs.shape)
-                action = self.get_action(latent_obs)
+                # get action
+                action = self.get_action(obs)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(action)
@@ -345,3 +345,11 @@ class Agent:
                         ep_entr_sum += policy_entropy
                         ep_alpha_sum += alpha
                         ep_alphaloss_sum += loss_alpha
+                        
+            # checkpoint
+            if (step % checkpoint == 0):
+                self.actor.save("models", "actor" + "_" + str(step))
+                self.critic1.save("models", "critic1" + "_" + str(step))
+                self.critic2.save("models", "critic2" + "_" + str(step))
+                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))

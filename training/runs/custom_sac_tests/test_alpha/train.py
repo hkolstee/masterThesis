@@ -33,8 +33,8 @@ def main():
     
     # train agent (ep = 720)
     sac_agent.train(nr_steps = 720 * 5500,
-                    warmup_steps = 5000,
-                    learn_delay = 1000,
+                    warmup_steps = 100,
+                    learn_delay = 100,
                     learn_freq = 1,
                     learn_weight = 1)
 
