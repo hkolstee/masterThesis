@@ -88,7 +88,7 @@ class Agent:
         # target entropy for automatic entropy coefficient adjustment
         self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
         # the entropy coef alpha which is to be optimized
-        self.log_alpha = torch.ones(1, requires_grad = True).to(self.device)
+        self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor
         self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
         self.alpha = torch.exp(self.log_alpha.detach())
 
@@ -125,6 +125,23 @@ class Agent:
         replay_act = torch.tensor(replay_act, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
+
+        # compute current policy action for pre-transition observation
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
+
+        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+        
+        # backward prop + gradient step
+        self.alpha_optimizer.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optimizer.step()   
+
+        # get next alpha
+        self.alpha = torch.exp(self.log_alpha.detach())
 
         # CRITIC GRADIENT
         # These Q values are the left hand side of the loss function
@@ -164,9 +181,6 @@ class Agent:
         for params in self.critic2.parameters():
             params.requires_grad = False
 
-        # compute current policy action for pre-transition observation
-        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
-
         # compute Q-values
         q1_policy = self.critic1.forward(obs, policy_act_prev_obs)
         q2_policy = self.critic2.forward(obs, policy_act_prev_obs)
@@ -186,20 +200,6 @@ class Agent:
             params.requires_grad = True
         for params in self.critic2.parameters():
             params.requires_grad = True         
-
-        # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-        # we detach because otherwise we backward through the graph of previous calculations using log_prob
-        #   which also raises an error fortunately, otherwise I would have missed this
-        alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
-        
-        # backward prop + gradient step
-        self.alpha_optimizer.zero_grad()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()   
-
-        # get next alpha
-        self.alpha = torch.exp(self.log_alpha.detach())
 
         # Polyak averaging update
         with torch.no_grad():

@@ -45,13 +45,13 @@ class Actor(MultiLayerPerceptron):
 
         return mean, std
     
-    def scale_action(self, action, lower_bound, higher_bound):
+    def scale_action(self, action):
         """
-        Rescale the action from [low, high] to [lower_bound, upper_bound]
+        Rescale the action from [low, high] to [-1, 1]
         (no need for symmetric action space)
         """
-        return (abs(lower_bound + higher_bound)) * ((action - self.action_low) / (self.action_high - self.action_low)) - lower_bound
-    
+        return 2 * ((action - self.action_low) / (self.action_high - self.action_low)) - 1
+
     def unscale_action(self, scaled_action):
         """
         Rescale the action from [-1, 1] to [low, high]
@@ -78,16 +78,21 @@ class Actor(MultiLayerPerceptron):
         else:
             sample = prob_distr.sample()
 
+        # tanh of action sample
+        tanh_action = torch.tanh(sample) 
+
         # log of the prob_distr function evaluated at sample value
         log_prob = prob_distr.log_prob(sample).sum(axis = -1) 
         # correct change in prob density due to tanh 
         #   (function = magic, taken from openAI spinning up)
         log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
+        # other function from stable baselines
+        # log_prob -= (torch.log(1 - tanh_action.pow(2) + 1e-6)).sum(axis = 1)
 
         # final action
         #   constrain action within [-1, 1] with tanh,
         #   unscale for regular action range.
-        action = self.unscale_action(torch.tanh(sample))
+        action = self.unscale_action(tanh_action)
         action = action.to(self.device) # should be on device
 
         return action, log_prob
