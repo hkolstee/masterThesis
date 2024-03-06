@@ -183,7 +183,7 @@ class Agents:
         alphas = []
         for agent_idx in range(self.nr_agents):
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs[agent_idx] + self.entropy_targs[agent_idx]).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizers[agent_idx].step()   
 
@@ -208,7 +208,7 @@ class Agents:
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
             # bellman = torch.mean(torch.tensor(rewards) + self.gamma * (1 - torch.tensor(dones)) * (q_targ - torch.tensor(self.alphas) * torch.tensor(log_prob_next_obs)))
-            bellman = np.mean([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)])
+            bellman = torch.cat([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]).mean()
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
