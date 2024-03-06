@@ -92,7 +92,8 @@ class Actor(MultiLayerPerceptron):
         #   (function = magic, taken from openAI spinning up)
         # log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
         # other function from stable baselines
-        log_prob -= torch.log(self.std_correction * (1 - tanh_action.pow(2)) + 1e-6).sum(1, keepdim = True)
+        log_prob -= torch.log(self.std_correction * (1 - tanh_action.pow(2)) + 1e-6)
+        log_prob = log_prob.sum(dim = 1, keepdim = True)
 
         # final action
         #   constrain action within [-1, 1] with tanh,

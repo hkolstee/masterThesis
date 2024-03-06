@@ -164,10 +164,10 @@ class Agent:
 
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        # loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        # loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
-        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
+        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+        # loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        # loss_critic2 = functional.mse_loss(q2_buffer, bellman)
         loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
         # backward prop + gradient step
