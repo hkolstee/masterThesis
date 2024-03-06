@@ -129,8 +129,11 @@ class Agent:
         # compute current policy action for pre-transition observation
         policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
 
+        # get next alpha
+        self.alpha = torch.exp(self.log_alpha.detach())
+
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
         #   which also raises an error fortunately, otherwise I would have missed this
         alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
@@ -139,9 +142,6 @@ class Agent:
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()   
-
-        # get next alpha
-        self.alpha = torch.exp(self.log_alpha.detach())
 
         # CRITIC GRADIENT
         # These Q values are the left hand side of the loss function
@@ -161,10 +161,13 @@ class Agent:
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
             bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
+
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+        # loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
+        # loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
         loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
         # backward prop + gradient step

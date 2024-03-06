@@ -31,6 +31,7 @@ class Critic(MultiLayerPerceptron):
                          layer_sizes = layer_sizes)
         
     def forward(self, obs, action):
+        input = torch.cat([obs, action], dim = -1).float()
         out = super().forward(torch.cat([obs, action], dim = -1).float())[0]
                 
-        return out.squeeze(-1)
+        return out

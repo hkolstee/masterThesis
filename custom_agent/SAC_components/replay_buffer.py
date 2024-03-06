@@ -19,8 +19,8 @@ class ReplayBuffer():
         self.obs_buffer = np.zeros((self.max_size, *observation_size))
         self.next_obs_buffer = np.zeros((self.max_size, *observation_size))
         self.action_buffer = np.zeros((self.max_size, *action_size))
-        self.reward_buffer = np.zeros((self.max_size))
-        self.done_buffer = np.zeros((self.max_size))
+        self.reward_buffer = np.zeros((self.max_size, 1))
+        self.done_buffer = np.zeros((self.max_size, 1))
         # keep track of memory index
         self.buffer_index = 0
         
