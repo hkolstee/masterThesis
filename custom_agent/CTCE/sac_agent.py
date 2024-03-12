@@ -52,7 +52,7 @@ class Agent:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
-                 ):
+                 logdir = "tensorboard_logs"):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -63,7 +63,7 @@ class Agent:
         self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
 
         # initialize tensorboard logger
-        self.logger = Logger(self.env)
+        self.logger = Logger(self.env, log_dir = logdir)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -136,7 +136,8 @@ class Agent:
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
         #   which also raises an error fortunately, otherwise I would have missed this
-        alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+        # alpha_loss = (-self.log_alpha * log_prob_prev_obs.detach() - self.log_alpha * self.entropy_targ).mean()
+        alpha_loss = (-self.log_alpha.exp() * log_prob_prev_obs.detach() - self.log_alpha.exp() * self.entropy_targ).mean()
         
         # backward prop + gradient step
         self.alpha_optimizer.zero_grad()
@@ -152,7 +153,6 @@ class Agent:
         with torch.no_grad():
             # targets from current policy (old policy = buffer)
             policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
-            # policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
 
             # target q values
             q1_policy_targ = self.critic1_targ.forward(next_obs, policy_act_next_obs)
@@ -164,10 +164,10 @@ class Agent:
 
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        # loss_critic1 = functional.mse_loss(q1_buffer, bellman)
-        # loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        # loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
+        # loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
+        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
         loss_critic = 0.5 * (loss_critic1 + loss_critic2)
 
         # backward prop + gradient step
@@ -231,7 +231,7 @@ class Agent:
                self.alpha.cpu().detach().numpy()[0], \
                alpha_loss.cpu().detach().numpy()
 
-    def get_action(self, obs, reparameterize = False, deterministic = False):
+    def get_action(self, obs, reparameterize = True, deterministic = False):
         # make tensor and send to device
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
