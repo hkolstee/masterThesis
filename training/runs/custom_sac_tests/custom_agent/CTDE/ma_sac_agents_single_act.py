@@ -178,7 +178,7 @@ class Agents:
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs[agent_idx] + self.entropy_targ[agent_idx]).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizers[agent_idx].step()   
 

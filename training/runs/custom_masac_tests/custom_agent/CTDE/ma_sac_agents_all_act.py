@@ -188,8 +188,8 @@ class Agents:
             #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
             # we detach because otherwise we backward through the graph of previous calculations using log_prob
             #   which also raises an error fortunately, otherwise I would have missed this
-            self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+            self.alpha_optimizers[agent_idx].zero_grad()        
+            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs[agent_idx] + self.entropy_targs[agent_idx]).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizers[agent_idx].step()   
 
