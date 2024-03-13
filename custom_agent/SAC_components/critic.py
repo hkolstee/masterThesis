@@ -34,4 +34,4 @@ class Critic(MultiLayerPerceptron):
         input = torch.cat([obs, action], dim = -1).float()
         out = super().forward(torch.cat([obs, action], dim = -1).float())[0]
                 
-        return out
+        return out.squeeze(-1)
