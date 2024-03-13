@@ -85,9 +85,9 @@ class Actor(MultiLayerPerceptron):
         log_prob = prob_distr.log_prob(sample).sum(axis = -1) 
         # correct change in prob density due to tanh 
         #   (function = magic, taken from openAI spinning up)
-        # log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
+        log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
         # other function from stable baselines
-        log_prob -= (torch.log(1 - tanh_action.pow(2) + 1e-6)).sum(axis = 1)
+        # log_prob -= (torch.log(1 - tanh_action.pow(2) + 1e-6)).sum(axis = 1)
 
         # final action
         #   constrain action within [-1, 1] with tanh,

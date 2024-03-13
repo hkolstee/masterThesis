@@ -1,0 +1,766 @@
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) 2023.01   2) StdEnv
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.2.0 => GCCcore/11.3.0
+  2) GMP/6.2.1-GCCcore-12.2.0 => GMP/6.2.1-GCCcore-11.3.0
+  3) Python/3.10.8-GCCcore-12.2.0 => Python/3.10.4-GCCcore-11.3.0
+  4) SQLite/3.39.4-GCCcore-12.2.0 => SQLite/3.38.3-GCCcore-11.3.0
+  5) Tcl/8.6.12-GCCcore-12.2.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.2.7-GCCcore-12.2.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.39-GCCcore-12.2.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.2.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.2.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.2.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.3-GCCcore-12.2.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) zlib/1.2.12-GCCcore-12.2.0 => zlib/1.2.12-GCCcore-11.3.0
+
+
+The following have been reloaded with a version change:
+  1) FFTW/3.3.10-GCC-11.3.0 => FFTW/3.3.10-GCC-12.3.0
+  2) FlexiBLAS/3.2.0-GCC-11.3.0 => FlexiBLAS/3.3.1-GCC-12.3.0
+  3) GCC/11.3.0 => GCC/12.3.0
+  4) GCCcore/11.3.0 => GCCcore/12.3.0
+  5) OpenBLAS/0.3.20-GCC-11.3.0 => OpenBLAS/0.3.23-GCC-12.3.0
+  6) Python/3.10.4-GCCcore-11.3.0 => Python/3.11.3-GCCcore-12.3.0
+  7) SQLite/3.38.3-GCCcore-11.3.0 => SQLite/3.42.0-GCCcore-12.3.0
+  8) SciPy-bundle/2022.05-foss-2022a => SciPy-bundle/2023.07-gfbf-2023a
+  9) Tcl/8.6.12-GCCcore-11.3.0 => Tcl/8.6.13-GCCcore-12.3.0
+ 10) XZ/5.2.5-GCCcore-11.3.0 => XZ/5.4.2-GCCcore-12.3.0
+ 11) binutils/2.38-GCCcore-11.3.0 => binutils/2.40-GCCcore-12.3.0
+ 12) bzip2/1.0.8-GCCcore-11.3.0 => bzip2/1.0.8-GCCcore-12.3.0
+ 13) libffi/3.4.2-GCCcore-11.3.0 => libffi/3.4.4-GCCcore-12.3.0
+ 14) libreadline/8.1.2-GCCcore-11.3.0 => libreadline/8.2-GCCcore-12.3.0
+ 15) ncurses/6.3-GCCcore-11.3.0 => ncurses/6.4-GCCcore-12.3.0
+ 16) pybind11/2.9.2-GCCcore-11.3.0 => pybind11/2.11.1-GCCcore-12.3.0
+ 17) zlib/1.2.12-GCCcore-11.3.0 => zlib/1.2.13-GCCcore-12.3.0
+
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.3.0 => GCCcore/11.3.0
+  2) Python/3.11.3-GCCcore-12.3.0 => Python/3.10.4-GCCcore-11.3.0
+  3) SQLite/3.42.0-GCCcore-12.3.0 => SQLite/3.38.3-GCCcore-11.3.0
+  4) SciPy-bundle/2023.07-gfbf-2023a => SciPy-bundle/2022.05-foss-2022a
+  5) Tcl/8.6.13-GCCcore-12.3.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.4.2-GCCcore-12.3.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.40-GCCcore-12.3.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.3.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.3.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.3.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.4-GCCcore-12.3.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) pybind11/2.11.1-GCCcore-12.3.0 => pybind11/2.9.2-GCCcore-11.3.0
+ 13) zlib/1.2.13-GCCcore-12.3.0 => zlib/1.2.12-GCCcore-11.3.0
+
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gym/spaces/box.py:73: UserWarning: [33mWARN: Box bound precision lowered by casting to float32[0m
+  logger.warn(
+[Episode 50 total reward: -452.460] ~ 
+[Episode 100 total reward: -565.154] ~ 
+[Episode 150 total reward: -456.407] ~ 
+[Episode 200 total reward: -452.154] ~ 
+Load factor
+Load factor
+[Episode 250 total reward: -431.196] ~ 
+[Episode 300 total reward: -406.418] ~ 
+[Episode 350 total reward: -423.352] ~ 
+[Episode 400 total reward: -394.784] ~ 
+[Episode 450 total reward: -347.115] ~ 
+[Episode 500 total reward: -355.302] ~ 
+[Episode 550 total reward: -332.387] ~ 
+[Episode 600 total reward: -309.678] ~ 
+[Episode 650 total reward: -312.512] ~ 
+[Episode 700 total reward: -301.925] ~ 
+[Episode 750 total reward: -292.657] ~ 
+[Episode 800 total reward: -281.481] ~ 
+[Episode 850 total reward: -278.948] ~ 
+[Episode 900 total reward: -273.589] ~ 
+[Episode 950 total reward: -266.421] ~ 
+[Episode 1000 total reward: -266.101] ~ 
+[Episode 1050 total reward: -268.578] ~ 
+[Episode 1100 total reward: -259.911] ~ 
+Load factor
+[Episode 1150 total reward: -272.866] ~ 
+[Episode 1200 total reward: -247.408] ~ 
+[Episode 1250 total reward: -245.216] ~ 
+[Episode 1300 total reward: -245.511] ~ 
+[Episode 1350 total reward: -240.316] ~ 
+[Episode 1400 total reward: -243.930] ~ 
+[Episode 1450 total reward: -233.828] ~ 
+[Episode 1500 total reward: -233.321] ~ 
+[Episode 1550 total reward: -239.547] ~ 
+[Episode 1600 total reward: -244.604] ~ 
+Load factor
+[Episode 1650 total reward: -246.029] ~ 
+[Episode 1700 total reward: -248.593] ~ 
+[Episode 1750 total reward: -242.152] ~ 
+[Episode 1800 total reward: -244.146] ~ 
+[Episode 1850 total reward: -237.987] ~ 
+[Episode 1900 total reward: -244.138] ~ 
+Load factor
+[Episode 1950 total reward: -249.200] ~ 
+Load factor
+[Episode 2000 total reward: -234.946] ~ 
+[Episode 2050 total reward: -240.941] ~ 
+Load factor
+Load factor
+[Episode 2100 total reward: -235.739] ~ 
+Load factor
+[Episode 2150 total reward: -243.228] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2200 total reward: -246.094] ~ 
+Load factor
+[Episode 2250 total reward: -239.523] ~ 
+Load factor
+Load factor
+[Episode 2300 total reward: -235.365] ~ 
+Load factor
+Load factor
+[Episode 2350 total reward: -275.562] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2400 total reward: -250.593] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2450 total reward: -244.017] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2500 total reward: -237.730] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2550 total reward: -246.794] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2600 total reward: -245.100] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2650 total reward: -242.454] ~ 
+Load factor
+Load factor
+[Episode 2700 total reward: -237.470] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2750 total reward: -259.889] ~ 
+Load factor
+Load factor
+Load factor
+[Episode 2800 total reward: -240.991] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2850 total reward: -250.846] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 2900 total reward: -250.176] ~ 
+Load factor
+[Episode 2950 total reward: -243.750] ~ 
+Load factor
+[Episode 3000 total reward: -256.384] ~ 
+Load factor
+Load factor
+[Episode 3050 total reward: -245.362] ~ 
+Load factor
+Load factor
+Load factor
+[Episode 3100 total reward: -242.395] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3150 total reward: -240.055] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3200 total reward: -236.882] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3250 total reward: -239.535] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3300 total reward: -235.546] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3350 total reward: -240.898] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3400 total reward: -243.534] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3450 total reward: -247.871] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3500 total reward: -245.054] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3550 total reward: -257.145] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3600 total reward: -247.886] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3650 total reward: -245.276] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3700 total reward: -247.041] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3750 total reward: -242.435] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3800 total reward: -234.340] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3850 total reward: -242.599] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3900 total reward: -237.473] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 3950 total reward: -235.475] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4000 total reward: -231.820] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4050 total reward: -236.865] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4100 total reward: -239.816] ~ 
+Load factor
+Load factor
+Load factor
+[Episode 4150 total reward: -249.386] ~ 
+Load factor
+Load factor
+[Episode 4200 total reward: -245.413] ~ 
+Load factor
+[Episode 4250 total reward: -236.915] ~ 
+Load factor
+Load factor
+Load factor
+[Episode 4300 total reward: -242.664] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4350 total reward: -244.863] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4400 total reward: -242.081] ~ 
+Load factor
+Load factor
+Load factor
+Load factor
+Load factor
+[Episode 4450 total reward: -247.773] ~ 
+Load factor
+[Episode 4500 total reward: -243.433] ~ 
+Load factor
+[Episode 4550 total reward: -235.859] ~ 
+[Episode 4600 total reward: -238.249] ~ 
+Load factor
+[Episode 4650 total reward: -238.664] ~ 
+[Episode 4700 total reward: -244.458] ~ 
+Load factor
+[Episode 4750 total reward: -240.309] ~ 
+[Episode 4800 total reward: -238.298] ~ 
+[Episode 4850 total reward: -245.760] ~ 
+Load factor
+[Episode 4900 total reward: -236.469] ~ 
+Load factor
+[Episode 4950 total reward: -240.431] ~ 
+[Episode 5000 total reward: -239.455] ~ 
+[Episode 5050 total reward: -239.834] ~ 
+[Episode 5100 total reward: -231.235] ~ 
+Load factor
+[Episode 5150 total reward: -227.986] ~ 
+[Episode 5200 total reward: -233.930] ~ 
+Load factor
+Load factor
+[Episode 5250 total reward: -229.114] ~ 
+[Episode 5300 total reward: -231.153] ~ 
+[Episode 5350 total reward: -232.681] ~ 
+[Episode 5400 total reward: -225.969] ~ 
+[Episode 5450 total reward: -231.820] ~ 
+[Episode 5500 total reward: -233.154] ~ 
+
+###############################################################################
+Hábrók Cluster
+Job 7481115 for user s3515249
+Finished at: Tue Mar  5 11:52:21 CET 2024
+
+Job details:
+============
+
+Job ID              : 7481115
+Name                : citylearn_simple_policy_test
+User                : s3515249
+Partition           : gpulong
+Nodes               : v100gpu23
+Number of Nodes     : 1
+Cores               : 1
+Number of Tasks     : 1
+State               : COMPLETED
+Submit              : 2024-03-03T16:49:03
+Start               : 2024-03-03T20:36:27
+End                 : 2024-03-05T11:52:18
+Reserved walltime   : 2-04:00:00
+Used walltime       : 1-15:15:51
+Used CPU time       : 1-14:57:18 (efficiency: 99.21%)
+% User (Computation): 96.59%
+% System (I/O)      :  3.41%
+Mem reserved        : 9500M
+Max Mem (Node/step) : 4.05G (v100gpu23, per node)
+Full Max Mem usage  : 4.05G
+Total Disk Read     : 3.07G
+Total Disk Write    : 71.12M
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################

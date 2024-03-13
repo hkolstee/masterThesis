@@ -160,15 +160,20 @@ class Agent:
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
+            # print(rewards.shape)
+            # print(dones.shape)
+            # print(self.alpha.shape)
+            # print(log_prob_next_obs.shape)
+            # print(self.gamma)
             bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
+            # print("B", bellman.shape)
 
-        
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         # loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
         # loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
         loss_critic1 = functional.mse_loss(q1_buffer, bellman)
         loss_critic2 = functional.mse_loss(q2_buffer, bellman)
-        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+        loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
 
         # backward prop + gradient step
         self.critic1.optimizer.zero_grad()
@@ -285,6 +290,10 @@ class Agent:
             ep_steps += 1
             # reward addition to total sum
             ep_rew_sum += reward
+
+            # set done to false if signal is because of time horizon (spinning up)
+            if ep_steps == max_episode_len:
+                done = False
 
             # add transition to buffer
             self.replay_buffer.add_transition(obs, action, reward, next_obs, done)
