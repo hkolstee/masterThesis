@@ -17,3 +17,35 @@ Found in literature about centralized critics:
 -> launch benchmarks
 -> literature research, classification in attributes of algos, how are they different, pros cons, etc
 
+
+sequentialization
+
+policy iteration
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+youtube lecture 
