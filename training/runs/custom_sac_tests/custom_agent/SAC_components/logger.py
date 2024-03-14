@@ -4,7 +4,6 @@ import sys
 import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
-from citylearn.citylearn import CityLearnEnv
 
 from custom_reward.custom_reward import CustomReward
 
@@ -17,11 +16,11 @@ class Logger():
             additional logging information is taken.
         log_dir (str): Logging directory
     """
-    def __init__(self, env: CityLearnEnv, log_dir: str = "tensorboard_logs"):
+    def __init__(self, env, log_dir = "tensorboard_logs"):
         # citylearn env to take logs from
         self.env = env
         # tensorboard summary writer
-        self.writer = SummaryWriter(log_dir = log_dir)
+        self.writer = SummaryWriter(log_dir)
 
     def log(self, logs: dict, step: int, group: str = ""):
         """Log values given in the dictionary.

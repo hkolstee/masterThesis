@@ -26,6 +26,7 @@ class Actor(MultiLayerPerceptron):
         # action scaling
         self.action_high = torch.tensor(action_high, dtype = torch.float32).to(self.device)
         self.action_low = torch.tensor(action_low, dtype = torch.float32).to(self.device)
+        self.std_correction = torch.tensor((action_high - action_low) / 2, dtype = torch.float32).to(self.device)
 
         # clamping region, values taken from paper
         self.clamp_log_min = -20  # -5 also used
@@ -39,6 +40,10 @@ class Actor(MultiLayerPerceptron):
         # we clamp the std (reason: we do not want an arbitrary large std)
         #   the original SAC paper clamps in the range of [-20, 2]
         log_std = torch.clamp(log_std, min = self.clamp_log_min, max = self.clamp_log_max)
+        # log_std = torch.tanh(log_std)
+        # LOG_MIN = -5
+        # LOG_MAX = 2
+        # log_std = LOG_MIN + 0.5 * (LOG_MAX - LOG_MIN) * (log_std + 1)
 
         # convert from log_std to normal std
         std = log_std.exp()
@@ -82,12 +87,14 @@ class Actor(MultiLayerPerceptron):
         tanh_action = torch.tanh(sample) 
 
         # log of the prob_distr function evaluated at sample value
-        log_prob = prob_distr.log_prob(sample).sum(axis = -1) 
+        log_prob = prob_distr.log_prob(sample)
+        log_prob = log_prob.sum(axis = -1)
         # correct change in prob density due to tanh 
         #   (function = magic, taken from openAI spinning up)
         log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
         # other function from stable baselines
-        # log_prob -= (torch.log(1 - tanh_action.pow(2) + 1e-6)).sum(axis = 1)
+        # log_prob -= torch.log(self.std_correction * (1 - tanh_action.pow(2)) + 1e-6)
+        # log_prob = log_prob.sum(dim = 1, keepdim = True)
 
         # final action
         #   constrain action within [-1, 1] with tanh,

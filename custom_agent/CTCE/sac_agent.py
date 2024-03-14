@@ -52,7 +52,8 @@ class Agent:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
-                 logdir = "tensorboard_logs"):
+                 log_dir = "tensorboard_logs"
+                 ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -63,7 +64,7 @@ class Agent:
         self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
 
         # initialize tensorboard logger
-        self.logger = Logger(self.env, log_dir = logdir)
+        self.logger = Logger(self.env, log_dir)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -129,9 +130,6 @@ class Agent:
         # compute current policy action for pre-transition observation
         policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
 
-        # get next alpha
-        self.alpha = torch.exp(self.log_alpha.detach())
-
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
@@ -143,6 +141,9 @@ class Agent:
         self.alpha_optimizer.zero_grad()
         alpha_loss.backward()
         self.alpha_optimizer.step()   
+
+        # get next alpha
+        self.alpha = torch.exp(self.log_alpha.detach())
 
         # CRITIC GRADIENT
         # These Q values are the left hand side of the loss function
@@ -160,17 +161,9 @@ class Agent:
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            # print(rewards.shape)
-            # print(dones.shape)
-            # print(self.alpha.shape)
-            # print(log_prob_next_obs.shape)
-            # print(self.gamma)
             bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
-            # print("B", bellman.shape)
 
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        # loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        # loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
         loss_critic1 = functional.mse_loss(q1_buffer, bellman)
         loss_critic2 = functional.mse_loss(q2_buffer, bellman)
         loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
@@ -216,17 +209,11 @@ class Agent:
                                                   self.critic1_targ.parameters(),
                                                   self.critic2_targ.parameters()):
                 # critic1
-                p1_targ.data.mul_(self.polyak)
-                p1_targ.data.add_((1 - self.polyak) * p1.data)
+                p1_targ.data *= self.polyak
+                p1_targ.data += ((1 - self.polyak) * p1.data)
                 # critic2
-                p2_targ.data.mul_(self.polyak)
-                p2_targ.data.add_((1 - self.polyak) * p2.data)
-                # # critic1
-                # p1_targ.data *= self.polyak
-                # p1_targ.data += ((1 - self.polyak) * p1.data)
-                # # critic2
-                # p2_targ.data *= self.polyak
-                # p2_targ.data += ((1 - self.polyak) * p2.data)
+                p2_targ.data *= self.polyak
+                p2_targ.data += ((1 - self.polyak) * p2.data)
         
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, \
@@ -247,7 +234,8 @@ class Agent:
 
         return actions.cpu().detach().numpy()[0]
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
+              checkpoint = 100000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -360,8 +348,8 @@ class Agent:
                         
             # checkpoint
             if (step % checkpoint == 0):
-                self.actor.save("models", "actor" + "_" + str(step))
-                self.critic1.save("models", "critic1" + "_" + str(step))
-                self.critic2.save("models", "critic2" + "_" + str(step))
-                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))
+                self.actor.save(save_dir, "actor" + "_" + str(step))
+                self.critic1.save(save_dir, "critic1" + "_" + str(step))
+                self.critic2.save(save_dir, "critic2" + "_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))

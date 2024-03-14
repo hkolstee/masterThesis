@@ -52,6 +52,7 @@ class Agent:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
+                 log_dir = "tensorboard_logs"
                  ):
         self.env = env
         self.gamma = gamma
@@ -63,7 +64,7 @@ class Agent:
         self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
 
         # initialize tensorboard logger
-        self.logger = Logger(self.env)
+        self.logger = Logger(self.env, log_dir)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -130,10 +131,11 @@ class Agent:
         policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
 
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
         #   which also raises an error fortunately, otherwise I would have missed this
-        alpha_loss = -(self.log_alpha * (log_prob_prev_obs + self.entropy_targ).detach()).mean()
+        # alpha_loss = (-self.log_alpha * log_prob_prev_obs.detach() - self.log_alpha * self.entropy_targ).mean()
+        alpha_loss = (-self.log_alpha.exp() * log_prob_prev_obs.detach() - self.log_alpha.exp() * self.entropy_targ).mean()
         
         # backward prop + gradient step
         self.alpha_optimizer.zero_grad()
@@ -152,7 +154,6 @@ class Agent:
         with torch.no_grad():
             # targets from current policy (old policy = buffer)
             policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
-            # policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
 
             # target q values
             q1_policy_targ = self.critic1_targ.forward(next_obs, policy_act_next_obs)
@@ -161,11 +162,11 @@ class Agent:
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
             bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
-        
+
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
 
         # backward prop + gradient step
         self.critic1.optimizer.zero_grad()
@@ -208,17 +209,11 @@ class Agent:
                                                   self.critic1_targ.parameters(),
                                                   self.critic2_targ.parameters()):
                 # critic1
-                p1_targ.data.mul_(self.polyak)
-                p1_targ.data.add_((1 - self.polyak) * p1.data)
+                p1_targ.data *= self.polyak
+                p1_targ.data += ((1 - self.polyak) * p1.data)
                 # critic2
-                p2_targ.data.mul_(self.polyak)
-                p2_targ.data.add_((1 - self.polyak) * p2.data)
-                # # critic1
-                # p1_targ.data *= self.polyak
-                # p1_targ.data += ((1 - self.polyak) * p1.data)
-                # # critic2
-                # p2_targ.data *= self.polyak
-                # p2_targ.data += ((1 - self.polyak) * p2.data)
+                p2_targ.data *= self.polyak
+                p2_targ.data += ((1 - self.polyak) * p2.data)
         
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, \
@@ -228,7 +223,7 @@ class Agent:
                self.alpha.cpu().detach().numpy()[0], \
                alpha_loss.cpu().detach().numpy()
 
-    def get_action(self, obs, reparameterize = False, deterministic = False):
+    def get_action(self, obs, reparameterize = True, deterministic = False):
         # make tensor and send to device
         if not isinstance(obs, torch.Tensor):
             obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
@@ -239,7 +234,8 @@ class Agent:
 
         return actions.cpu().detach().numpy()[0]
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
+              checkpoint = 100000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -282,6 +278,10 @@ class Agent:
             ep_steps += 1
             # reward addition to total sum
             ep_rew_sum += reward
+
+            # set done to false if signal is because of time horizon (spinning up)
+            if ep_steps == max_episode_len:
+                done = False
 
             # add transition to buffer
             self.replay_buffer.add_transition(obs, action, reward, next_obs, done)
@@ -348,8 +348,8 @@ class Agent:
                         
             # checkpoint
             if (step % checkpoint == 0):
-                self.actor.save("models", "actor" + "_" + str(step))
-                self.critic1.save("models", "critic1" + "_" + str(step))
-                self.critic2.save("models", "critic2" + "_" + str(step))
-                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))
+                self.actor.save(save_dir, "actor" + "_" + str(step))
+                self.critic1.save(save_dir, "critic1" + "_" + str(step))
+                self.critic2.save(save_dir, "critic2" + "_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))

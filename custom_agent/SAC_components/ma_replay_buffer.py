@@ -29,8 +29,8 @@ class MultiAgentReplayBuffer:
             self.obs_buffer.append(np.zeros((self.max_size, *obs_size)))
             self.next_obs_buffer.append(np.zeros((self.max_size, *obs_size)))
             self.action_buffer.append(np.zeros((self.max_size, *act_size)))
-            self.reward_buffer.append(np.zeros((self.max_size, 1)))
-            self.done_buffer.append(np.zeros((self.max_size, 1)))
+            self.reward_buffer.append(np.zeros((self.max_size)))
+            self.done_buffer.append(np.zeros((self.max_size)))
         # keep track of memory index
         self.buffer_index = 0
 
