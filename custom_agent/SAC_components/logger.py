@@ -16,11 +16,11 @@ class Logger():
             additional logging information is taken.
         log_dir (str): Logging directory
     """
-    def __init__(self, env, log_dir = "tensorboard_logs"):
+    def __init__(self, env, log_dir):
         # citylearn env to take logs from
         self.env = env
         # tensorboard summary writer
-        self.writer = SummaryWriter(log_dir)
+        self.writer = SummaryWriter(log_dir = log_dir)
 
     def log(self, logs: dict, step: int, group: str = ""):
         """Log values given in the dictionary.

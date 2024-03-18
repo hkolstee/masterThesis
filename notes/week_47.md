@@ -1,10 +1,12 @@
 # Notes Week 47
+
 ---
-### Dynamics independency of CityLearn 2023:
+
+### Dynamics independency of CityLearn 2023
 
 A choice has to be made to utilize pre-computed or pre-measured load demands from .csv building files to satisfy some pre-calculated indoor dry bulb temperature. It is mentioned that the heating and cooling loads are ideal, yet the given pre-calculated temperatures still indicate a temperature delta with the ideal temperature (the setpoint).
 
-(ideal load refers to the energy that must be provided by an energy system to meet a control setpoint e.g. an air conditioner providing cooling energy to meet a cooling temperature setpoint of 22C in a room) 
+(ideal load refers to the energy that must be provided by an energy system to meet a control setpoint e.g. an air conditioner providing cooling energy to meet a cooling temperature setpoint of 22C in a room)
 
 Found in the building class documentation (likewise for heating demand):
 
@@ -24,15 +26,15 @@ When using the pre-measured indoor temperatures and heating/cooling loads, the h
 
 Using the pre-measured data would change the action space to only charging and providing energy by energy storage devices, cooling and heating actions will be taken from the .csv data.
 
-##### Dynamics independent variables:
+##### Dynamics independent variables
 
 1. Neighborhood level variables:
-   - Calendar type variables: 
+   - Calendar type variables:
      - Month
      - Hour
      - Day type
      - Daylight saving status
-   - Weather type variables: 
+   - Weather type variables:
      - Outdoor dry bulb temp (0h, 6h, 12h, 24h)
      - Outdoor relative humidity (0h, 6h, 12h, 24h)
      - Diffuse solar irradiance (0h, 6h, 12h, 24h)
@@ -47,7 +49,7 @@ Using the pre-measured data would change the action space to only charging and p
    - Electricity pricing (0h, 6h, 12h, 24h)
    - Indoor dry bulb temperature set point
 
-##### Dynamics dependent variables:
+##### Dynamics dependent variables
 
 1. Neighborhood level variables:
    - None
@@ -63,7 +65,7 @@ Using the pre-measured data would change the action space to only charging and p
    - Heating electricity consumption
    - Domestic hot water electricity consumption
 
-##### Either taken from .csv file or calculated during runtime:
+##### Either taken from .csv file or calculated during runtime
 
 1. Neighborhood level variables:
    - None
@@ -73,7 +75,7 @@ Using the pre-measured data would change the action space to only charging and p
    - Heating demand
    - Domestic hot water demand
    - Indoor dry bulb temperature difference to set point
-   - Power outage boolean (?) 
+   - Power outage boolean (?)
 
 ---
 
@@ -115,5 +117,4 @@ apply_actions(cooling_device_action: Optional[float] = None, heating_device_acti
 
 CityLearn supports centralized, decentralized-independent and decentralized-coordinated control architectures. In the centralized architecture, 1 agent controls all storage, cooling and heating devices i.e. provides as many actions as storage, cooling and heating devices in the district. In the decentralized-independent architecture, each building has it’s own unique agent and building agents do not share information i.e. each agent acts in isolation and provides as many actions as storage, cooling and heating devices in the building it controls. The decentralized-coordinated architecture is similar to the decentralized-independent architecture with the exception of information sharing amongst agents.
 
-Here we see the trade off between the centralized control and execution and its large action and state space, and the less intense action space of decentralized-coordinated architecture. 
-
+Here we see the trade off between the centralized control and execution and its large action and state space, and the less intense action space of decentralized-coordinated architecture.
