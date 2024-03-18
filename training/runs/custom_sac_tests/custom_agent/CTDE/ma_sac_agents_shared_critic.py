@@ -55,6 +55,7 @@ class Agents:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
+                 log_dir = "tensorboard_logs"
                  ):
         self.env = env
         self.gamma = gamma
@@ -66,8 +67,8 @@ class Agents:
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         
         # initialize logger
-        self.logger = Logger(self.env)
-        
+        self.logger = Logger(self.env, log_dir)
+
         # for now done like this: check if citylearn env with custom reward function for 
         #   additional logging
         self.citylearn = isinstance(self.env.reward_function, CustomReward) \
@@ -86,7 +87,7 @@ class Agents:
         for (obs_space, act_space) in zip(self.env.observation_space, self.env.action_space):
             self.actors.append(Actor(lr_actor, obs_space.shape[0], act_space.shape[0], act_space.low, act_space.high, layer_sizes))
         
-        # two global critics (two for stable learning), 
+        # two centralized critics (two for stable learning), 
         #   gets combination set of all obs and actions of all agents, but is only used while training
         # get global obs and action size
         obs_size_global = sum([obs.shape[0] for obs in self.env.observation_space])
@@ -166,10 +167,7 @@ class Agents:
             policy_act_next_obs, log_prob_next_obs = \
                 zip(*[actor.normal_distr_sample(next_obs) for (actor, next_obs) in zip(self.actors, next_observations)])
             policy_act_next_obs_set = torch.cat(policy_act_next_obs, axis = 1)
-        
-        for actor in self.actors:
-            actor.optimizer.zero_grad()    
-        
+                
         # with grad 
         policy_act_prev_obs, log_prob_prev_obs = \
             zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, observations)])
@@ -182,19 +180,17 @@ class Agents:
         #   which also raises an error fortunately, otherwise I would have missed this
         alphas = []
         for agent_idx in range(self.nr_agents):
+            alpha_loss = -(self.log_alphas[agent_idx].exp() * (log_prob_prev_obs[agent_idx].detach() + self.entropy_targs[agent_idx])).mean()
+
+            # backward prop + gradient step
             self.alpha_optimizers[agent_idx].zero_grad()
-            alpha_loss = -(self.log_alphas[agent_idx] * (log_prob_prev_obs[agent_idx] + self.entropy_targs[agent_idx]).detach()).mean()
             alpha_loss.backward()
             self.alpha_optimizers[agent_idx].step()   
 
             # get current alpha
             alphas.append(torch.exp(self.log_alphas[agent_idx].detach()))
 
-        # CRITIC GRADIENT
-        # reset gradients
-        self.critic1.optimizer.zero_grad()
-        self.critic2.optimizer.zero_grad()
-        
+        # CRITIC GRADIENT        
         # These Q values are the left hand side of the loss function
         q1_buffer = self.critic1.forward(obs_set, replay_act_set)
         q2_buffer = self.critic2.forward(obs_set, replay_act_set)
@@ -207,14 +203,18 @@ class Agents:
             # clipped double Q trick
             q_targ = torch.min(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            # bellman = torch.mean(torch.tensor(rewards) + self.gamma * (1 - torch.tensor(dones)) * (q_targ - torch.tensor(self.alphas) * torch.tensor(log_prob_next_obs)))
-            bellman = torch.cat([rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]).mean()
+            bellman = [rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]
+            # stack along first dimension [batch, nr_agents], then mean per element over all agents
+            bellman = torch.stack(bellman, dim = 1).mean(dim = 1)
         
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = torch.pow((q1_buffer - bellman), 2).mean()
-        loss_critic2 = torch.pow((q2_buffer - bellman), 2).mean()
-        loss_critic = 0.5 * (loss_critic1 + loss_critic2)
+        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        loss_critic = loss_critic1 + loss_critic2
 
+        # reset gradients
+        self.critic1.optimizer.zero_grad()
+        self.critic2.optimizer.zero_grad()
         # backward prop
         loss_critic.backward()
         # step down gradient
@@ -232,16 +232,18 @@ class Agents:
             # compute Q-values
             # for this we need set of actions of all agents, where the gradient graph only
             #   persists of the action of the current actor
-            action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
+            policy_action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
                             in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            q1_policy = self.critic1.forward(obs_set, action_set)
-            q2_policy = self.critic2.forward(obs_set, action_set)
+            q1_policy = self.critic1.forward(obs_set, policy_action_set)
+            q2_policy = self.critic2.forward(obs_set, policy_action_set)
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
             q_policy = torch.min(q1_policy, q2_policy)
             # entropy regularized loss
             loss_policy = (alphas[agent_idx] * log_prob_prev_obs[agent_idx] - q_policy).mean()
 
+            # reset gradient
+            self.actors[agent_idx].optimizer.zero_grad()
             # backward prop
             loss_policy.backward()
             # step down gradient
@@ -277,7 +279,7 @@ class Agents:
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, np.array(loss_policy_list), np.array(loss_critic_list), np.array(log_prob_list), np.array(alpha_list), np.array(alpha_loss_list)
 
-    def get_action(self, observations, reparameterize = False, deterministic = False):
+    def get_action(self, observations, reparameterize = True, deterministic = False):
         # get actor action
         action_list = []
         with torch.no_grad():
@@ -291,7 +293,8 @@ class Agents:
 
         return action_list
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, checkpoint = 100000):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
+              checkpoint = 100000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -404,11 +407,11 @@ class Agents:
             # checkpoint
             if (step % checkpoint == 0):
                 for actor_idx in range(len(self.actors)):
-                    self.actors[actor_idx].save("models", "actor" + str(actor_idx) + "_" + str(step))
-                self.critic1.save("models", "critic1" + "_" + str(step))
-                self.critic2.save("models", "critic2" + "_" + str(step))
-                self.critic1_targ.save("models", "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save("models", "critic2_targ" + "_" + str(step))
+                    self.actors[actor_idx].save(save_dir, "actor" + str(actor_idx) + "_" + str(step))
+                self.critic1.save(save_dir, "critic1" + "_" + str(step))
+                self.critic2.save(save_dir, "critic2" + "_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
 
 
 

@@ -234,7 +234,7 @@ class Agent:
                self.alpha.cpu().detach().numpy()[0], \
                alpha_loss.cpu().detach().numpy()
 
-    def get_action(self, obs, reparameterize = False, deterministic = False):
+    def get_action(self, obs, reparameterize = True, deterministic = False):
         # make tensor and send to device
         # obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
 
