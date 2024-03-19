@@ -205,7 +205,7 @@ class Agents:
                 q1_policy_targ = self.critics1_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
                 q2_policy_targ = self.critics2_targ[agent_idx].forward(next_obs_set, policy_act_next_obs_set)
                 # clipped double Q trick
-                q_targ = torch.min(q1_policy_targ, q2_policy_targ)
+                q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
                 # Bellman approximation
                 bellman = rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alpha * log_prob_next_obs[agent_idx])
             
@@ -238,7 +238,7 @@ class Agents:
             q2_policy = self.critics2[agent_idx].forward(obs_set, policy_action_set)
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
-            q_policy = torch.min(q1_policy, q2_policy)
+            q_policy = torch.minimum(q1_policy, q2_policy)
             # entropy regularized loss
             loss_policy = (alpha * log_prob_prev_obs[agent_idx] - q_policy).mean()
 

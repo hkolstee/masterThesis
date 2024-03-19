@@ -135,7 +135,7 @@ class Agents:
             # print("2", seq_q_vals.shape, q1_buffer.shape)
             seq_q_vals = torch.column_stack((seq_q_vals, q1_buffer))
 
-        return q1_buffer
+        return seq_q_vals
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -216,34 +216,37 @@ class Agents:
         # These Q values are the left hand side of the loss function
         q1_buffer = self.getSequentialQ(obs_set, replay_act_set, self.critics1)
         q2_buffer = self.getSequentialQ(obs_set, replay_act_set, self.critics2)
-        
+
         # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
         with torch.no_grad():
             # target q values
             q1_policy_targ = self.getSequentialQ(next_obs_set, policy_act_next_obs_set, self.critics1_targ)
             q2_policy_targ = self.getSequentialQ(next_obs_set, policy_act_next_obs_set, self.critics2_targ)
+
             # clipped double Q trick
             q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            bellman = [rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]
+            bellman = [rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ[:, agent_idx] - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]
             # stack along first dimension [batch, nr_agents], then mean per element over all agents
-            bellman = torch.stack(bellman, dim = 1).mean(dim = 1)
+            # bellman = torch.stack(bellman, dim = 1).mean(dim = 1)
+            bellman = torch.column_stack(bellman)
 
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = functional.mse_loss(q1_buffer, bellman)
         loss_critic2 = functional.mse_loss(q2_buffer, bellman)
         loss_critic = loss_critic1 + loss_critic2
 
+        # zero gradients
         for agent_idx in range(self.nr_agents):
-            # zero gradients
             self.critics1[agent_idx].optimizer.zero_grad()
             self.critics2[agent_idx].optimizer.zero_grad()
         # backward prop the loss
         loss_critic.backward()
+        # step down gradient
         for agent_idx in range(self.nr_agents):
-            # step down gradient
             self.critics1[agent_idx].optimizer.step()
             self.critics2[agent_idx].optimizer.step()
+
 
         for agent_idx in range(self.nr_agents):
             # ACTOR GRADIENT
@@ -258,8 +261,8 @@ class Agents:
             #   persists of the action of the current actor
             policy_action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
                             in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            q1_policy = self.getSequentialQ(obs_set, policy_action_set, self.critics1)
-            q2_policy = self.getSequentialQ(obs_set, policy_action_set, self.critics2)
+            q1_policy = self.getSequentialQ(obs_set, policy_action_set, self.critics1)[:, self.nr_agents - 1]
+            q2_policy = self.getSequentialQ(obs_set, policy_action_set, self.critics2)[:, self.nr_agents - 1]
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
             q_policy = torch.minimum(q1_policy, q2_policy)
