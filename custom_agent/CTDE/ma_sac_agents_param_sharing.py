@@ -81,11 +81,16 @@ class Agents:
         obs_size_list = [obs.shape for obs in self.env.observation_space]
         act_size_list = [act.shape for act in self.env.action_space]
         self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_size_list, act_size_list, batch_size)
-        
-        # one local actor per agent, gets local observations only
-        self.actors = nn.ModuleList()
-        for (obs_space, act_space) in zip(self.env.observation_space, self.env.action_space):
-            self.actors.append(Actor(lr_actor, obs_space.shape[0], act_space.shape[0], act_space.low, act_space.high, layer_sizes))
+
+        # one-hot identity per agent
+        self.agent_ids = functional.one_hot(torch.tensor(range(self.nr_agents))).float()
+        # one actor with parameter sharing, one-hot identity, assumes homogeneous agents
+        self.actor = Actor(lr_actor, 
+                           self.env.observation_space.shape[0] + self.agent_ids[0].shape[0], 
+                           self.env.action_space.shape[0], 
+                           self.env.action_space.low, 
+                           self.env.action_space.high, 
+                           layer_sizes)
         
         # two centralized critics (two for stable learning), 
         #   gets combination set of all obs and actions of all agents, but is only used while training
