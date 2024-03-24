@@ -81,19 +81,19 @@ class Agents:
         obs_size_list = [obs.shape for obs in self.env.observation_space]
         act_size_list = [act.shape for act in self.env.action_space]
         self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_size_list, act_size_list, batch_size)
-        
+
         # one local actor per agent, gets local observations only
         self.actors = nn.ModuleList()
         for (obs_space, act_space) in zip(self.env.observation_space, self.env.action_space):
             self.actors.append(Actor(lr_actor, obs_space.shape[0], act_space.shape[0], act_space.low, act_space.high, layer_sizes))
-        
+
         # two centralized critics (two for stable learning), 
         #   gets combination set of all obs and actions of all agents, but is only used while training
-        # get global obs and action size
+        #   also gets one-hot identity
         obs_size_global = sum([obs.shape[0] for obs in self.env.observation_space])
         act_size_global = sum([act.shape[0] for act in self.env.action_space])
-        self.critic1 = Critic(lr_critic, obs_size_global, act_size_global, layer_sizes)
-        self.critic2 = Critic(lr_critic, obs_size_global, act_size_global, layer_sizes)
+        self.critic1 = Critic(lr_critic, obs_size_global + self.agent_ids[0].shape[0], act_size_global, layer_sizes)
+        self.critic2 = Critic(lr_critic, obs_size_global + self.agent_ids[0].shape[0], act_size_global, layer_sizes)
 
         # make copy target critic networks which only get updated using polyak averaging
         self.critic1_targ = deepcopy(self.critic1)
@@ -201,7 +201,7 @@ class Agents:
             q1_policy_targ = self.critic1_targ.forward(next_obs_set, policy_act_next_obs_set)
             q2_policy_targ = self.critic2_targ.forward(next_obs_set, policy_act_next_obs_set)
             # clipped double Q trick
-            q_targ = torch.min(q1_policy_targ, q2_policy_targ)
+            q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
             bellman = [rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ - alphas[agent_idx] * log_prob_next_obs[agent_idx]) for agent_idx in range(self.nr_agents)]
             # stack along first dimension [batch, nr_agents], then mean per element over all agents
@@ -238,7 +238,7 @@ class Agents:
             q2_policy = self.critic2.forward(obs_set, policy_action_set)
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
-            q_policy = torch.min(q1_policy, q2_policy)
+            q_policy = torch.minimum(q1_policy, q2_policy)
             # entropy regularized loss
             loss_policy = (alphas[agent_idx] * log_prob_prev_obs[agent_idx] - q_policy).mean()
 
