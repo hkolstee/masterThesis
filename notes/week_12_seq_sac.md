@@ -55,6 +55,7 @@ $$
 \end{align*}
 $$
 where:
+
 - $y(R,S', d)$: Critic target.
 - $\mathbf{w}$: Critic parameters (Two critics for clipped double Q, plus two target critics).
 - $\theta$: Actor parameters.
@@ -66,10 +67,12 @@ $$
     &\tilde{A}(S|\theta) = \tanh (\mu_\theta(S) + \sigma(S) \odot \xi), &\xi \sim N(0, I)
 \end{align*}
 $$
+
 - $\mathcal{H}$: the entropy target, often taken as $-\text{dim} (\mathcal{A})$, where $\mathcal{A}$ is the action space.
 
 #### For an $m$-agent problem, we change this to:
-For each stage $i$ in the sequential $Q$-calculation, from $i = 1, \ldots,m$, we have two a set of two ($k=1,2$) $Q$-functions to perform clipped double $Q$-learning.
+
+For each stage $i$ in the sequential $Q$-calculation, from $i = 1, \ldots,m$, we have a set of two ($k=1,2$) $Q$-functions to perform clipped double $Q$-learning.
 
 $$
 \begin{align*}
