@@ -77,9 +77,9 @@ For each stage $i$ in the sequential $Q$-calculation, from $i = 1, \ldots,m$, we
 $$
 \begin{align*}
     &y_i(R_i, S, d) = R_i + \gamma(1 - d) \left ( \min_{k=1,2}Q^{targ}_{i,k}(S, A_1, \ldots, A_{i}; \mathbf{w}^{targ}_{i,k}) - \alpha_i \log \pi_i (A_i|S, A_1, \ldots, A_{i-1}; \theta_i) \right)\\
-    &y_m(R, S', d) = R + \gamma(1 - d) \left ( \min_{k=1,2}Q^{targ}_{m,k}(S', A'_1, \ldots, A'_{m}; \mathbf{w}^{targ}_{m,k}) - \alpha_m \log \pi_m (A'_m|S', A'_1, \ldots, A'_{m-1}; \theta_m) \right), & A'_i \sim \pi_i(\cdot| S', A'_1, \ldots, A'_{i-1})\\
-    &J_{Q_i} (\mathbf{w}_i) = \frac{1}{2}\sum_{k=1,2}(Q_{i-1, k}(S, A_1, \ldots, A_{i-1}; \mathbf{w}_{i-1, k}) - y_{i}(R_i, S, d))^2 \\
-    &J_{Q_m} (\mathbf{w}_m) = \frac{1}{2}\sum_{k=1,2}(Q_{1, k}(S, A_1; \mathbf{w}_1) - y_{m}(R, S', d))^2\\
+    &y_m(R, S', d) = R + \gamma(1 - d) \left ( \min_{k=1,2}Q^{targ}_{1,k}(S', A'_1; \mathbf{w}^{targ}_{1,k}) - \alpha_1 \log \pi_1 (A'_1|S'; \theta_1) \right), & A'_i \sim \pi_i(\cdot| S', A'_1, \ldots, A'_{i-1})\\
+    &J_{Q_i} (\mathbf{w}_i) = \frac{1}{2}\sum_{k=1,2}(Q_{i, k}(S, A_1, \ldots, A_{i}; \mathbf{w}_{i, k}) - y_{i+1}(R_i, S, d))^2 \\
+    &J_{Q_m} (\mathbf{w}_m) = \frac{1}{2}\sum_{k=1,2}(Q_{m, k}(S, A_1, \ldots, A_m; \mathbf{w}_m) - y_{m}(R, S', d))^2\\
     &J_{\pi_i}(\theta_i) =  \alpha_i \log \pi_i(\tilde{A}(S|\theta) | S, A_1, \ldots, A_{i-1}; \theta) - \min_{k=1,2} Q_{i,k} (S, A_1, \ldots, \tilde{A}_i(S|\theta); \mathbf{w})  \\
     &J(\alpha_i) = -\alpha_i (\log\pi_i(A_i|S, A_1, \ldots, A_{i-1}) + \mathcal{H_i})\\
 \end{align*}
@@ -96,9 +96,9 @@ where:
 For each gradient step:
 $$
 \begin{align*}
-    &A_1 \sim \pi_1 (\cdot | S; \theta_1), A_2 \sim \pi_2(\cdot | S, A_1; \theta_2), \ldots, A_m \sim \pi_m(\cdot | S, A_1, \ldots, A_{m-1};\theta_m)\\
+    &A_i \sim \pi_i(\cdot | S, A_1, \ldots, A_{i-1};\theta_) & \text{ for } i = 1, \ldots, m-1\\
     &\text{Take actions } A_1,\ldots,A_m \text{ observe } S', R\\
-    &A'_1 \sim \pi_1 (\cdot | S'; \theta_1), A'_2 \sim \pi_2(\cdot | S', A'_1; \theta_2), \ldots, A'_m \sim \pi_m(\cdot | S', A'_1, \ldots, A'_{m-1};\theta_m)\\
+    &A'_i \sim \pi_i(\cdot | S', A'_1, \ldots, A'_{i-1};\theta_i) & \text{ for } i = 1, \ldots, m-1\\
     &\mathbf{w}_{i,k} \leftarrow \mathbf{w}_{i,k} - \lambda^{\mathbf{w}_{i,k}} \nabla_{\mathbf{w}_{i,k}} J_{Q_i}(\mathbf{w}_{i,k})  & \text{ for } k = 1, 2, \text{ and } i = 1, \ldots, m\\
     &\theta_i \leftarrow \theta_i - \lambda^{\theta_i} \nabla_{\theta_i} J_{\pi_i}(\theta_i) & \text{ for } i = 1, \ldots, m\\
     & \alpha_i \leftarrow \alpha_i - \lambda{^\alpha_i} \nabla_{\alpha_i} J(\alpha_i) & \text{ for } i = 1, \ldots, m\\

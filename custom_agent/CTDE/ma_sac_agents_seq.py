@@ -106,8 +106,8 @@ class Agents:
             # actor
             self.actors.append(Actor(lr_actor, obs_space.shape[0] + seq_act, act_space.shape[0], act_space.low, act_space.high, layer_sizes))
             # global centralized critics
-            self.critics1.append(Critic(lr_critic, obs_size_global + seq_act, act_size_global, layer_sizes))
-            self.critics2.append(Critic(lr_critic, obs_size_global + seq_act, act_size_global, layer_sizes))
+            self.critics1.append(Critic(lr_critic, obs_size_global, act_space.shape[0] + seq_act, layer_sizes))
+            self.critics2.append(Critic(lr_critic, obs_size_global, act_space.shape[0] + seq_act, layer_sizes))
             seq_act += act_space.shape[0]
 
         # make copy target critic networks which only get updated using polyak averaging
@@ -135,46 +135,55 @@ class Agents:
         """Sequentially get values by introducing the last output as input into the next network forward"""
         # initialize as empty(batch, 0)
         seq_acts = torch.empty((observations[0].shape[0], 0))
-        logps = []
+        seq_act_list = []
+        logps_list = []
         for agent_idx, obs in enumerate(observations):
             # get action and logp
-            stacked = torch.column_stack((obs, seq_acts))
+            stacked = torch.cat([obs, seq_acts], dim = 1)
             act, logp = self.actors[agent_idx].normal_distr_sample(stacked)
+            # prepare for next input
+            seq_acts = torch.cat([seq_acts, act], dim = 1)
             # append
-            seq_acts = torch.column_stack((seq_acts, act))
-            logps.append(logp)
+            seq_act_list.append(act)
+            logps_list.append(logp)
 
-        # post process into list
-        seq_act_list = []
-        for idx in range(seq_acts.shape[1]):
-            seq_act_list.append(seq_acts[:, idx])
-
-        return seq_act_list, logps
+        return seq_act_list, logps_list
     
-    def getSequentialQs(self, obs, acts, next_obs):
-        """Sequentially get total Q-value by introducing the last agents Q-value as input into the next agents Q-val"""
-        seq_q = torch.empty((obs.shape[0], 0))
-        seq_q_targ = torch.empty((obs.shape[0], 0))
-        # we need values for the first m-1 and target values for last m-1 Qs
-        for agent_idx in range(self.nr_agents - 1):
-            # get Qval
-                q1_targ = self.critics1_targ[agent_idx + 1].forward(torch.column_stack((obs, seq_q1)), acts)
-                q2_targ = self.critics2_targ[agent_idx + 1].forward(torch.column_stack((obs, seq_q2)), acts)
+    def getSequentialQs(self, obs, acts, next_obs, next_acts):
+        """
+        Get Q-values by iteratively introducing agent actions sequentially, 
+        similar to how the sequential policy calculates actions.
+        """
+        seq_q1, seq_q2, seq_q1_targ, seq_q2_targ = [],[],[],[]
+        
+        # current sequential actions
+        seq_acts = torch.empty((acts[0].shape[0], 0))
+        
+        for agent_idx in range(self.nr_agents):
+            # add action for input
+            seq_acts = torch.column_stack((seq_acts, acts[agent_idx]))
+            
+            # get Qvals, Q1_targ is used as target for Qm, where Q1_targ is conditioned on the next state and first next action
+            # targ no grad
+            with torch.no_grad():
+                if agent_idx == 0:
+                    q1_targ = self.critics1_targ[agent_idx].forward(next_obs, next_acts[0])
+                    q2_targ = self.critics2_targ[agent_idx].forward(next_obs, next_acts[0])
+                else:
+                    q1_targ = self.critics1_targ[agent_idx].forward(obs, seq_acts)
+                    q2_targ = self.critics2_targ[agent_idx].forward(obs, seq_acts)
+            # with grad
+            print(obs.shape, seq_acts.shape)
+            q1 = self.critics1[agent_idx].forward(obs, seq_acts)
+            q2 = self.critics2[agent_idx].forward(obs, seq_acts)
 
-                q1 = self.critics1[agent_idx].forward(torch.column_stack((obs, seq_q1)), acts)
-                q2 = self.critics2[agent_idx].forward(torch.column_stack((obs, seq_q2)), acts)
-            # take minumum
-            seq_q1 = torch.column_stack((seq_q1, q1))
-            seq_q2 = torch.column_stack((seq_q2, q2))
+            # add to list
+            seq_q1.append(q1)
+            seq_q2.append(q2)
+            seq_q1_targ.append(q1_targ)
+            seq_q2_targ.append(q2_targ)
 
-        # take minimum and create lists
-        seq_q1_list = []
-        seq_q2_list = []
-        for idx in range(seq_q1_vals.shape[1]):
-            seq_q1_list.append(seq_q1_vals[:, idx])
-            seq_q2_list.append(seq_q2_vals[:, idx])
-
-        return seq_q1_list, seq_q2_list
+        return seq_q1, seq_q2, seq_q1_targ, seq_q2_targ
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -230,7 +239,7 @@ class Agents:
         # with grad 
         pi_actions, logp = self.getSequentialAct(obs)
         # create entire set, without grad
-        pi_actions_nograd = [act.detach() for act in pi_actions]
+        pi_act_nograd = [act.detach() for act in pi_actions]
         
         alphas = []
         for agent_idx in range(self.nr_agents):
@@ -249,28 +258,30 @@ class Agents:
             alphas.append(torch.exp(self.log_alphas[agent_idx].detach()))
 
         # CRITIC GRADIENT            
-        # with grad, left hand side of equation, get compared to target (bellman)
-        q1 = self.getSequentialQs(obs_set, replay_act_set)
-        q2 = self.getSequentialQs(obs_set, replay_act_set)
+        # get Q values
+        q1, q2, q1_targ, q2_targ = self.getSequentialQs(obs_set, replay_act, next_obs_set, pi_next_actions)
         
         with torch.no_grad():
-            # target q values
-            q1_targ = self.getSequentialQs(obs_set, torch.column_stack(pi_next_actions), next_obs_set, torch.column_stack(pi_next_actions), targ = True)
-            q2_targ = self.getSequentialQs(obs_set, torch.column_stack(pi_next_actions), next_obs_set, torch.column_stack(pi_next_actions), targ = True)
-
             # get min q_targ network values
             q_targ = []
             for targ_val1, targ_val2 in zip(q1_targ, q2_targ):
                 q_targ.append(torch.minimum(targ_val1, targ_val2))
 
-            # gradients for all but last critic in sequence is the difference to the previous critic in sequence
+            # gradients for all but last critic in sequence is the normal target but substituted by next critic in sequence
+            #   with current state and actions
             bellman = []
             for agent_idx in range(self.nr_agents - 1):
+                # we take the next in sequence
+                idx = agent_idx + 1
                 # bellman target on next in sequence q_targ network
-                bellman.append(rewards[agent_idx] + self.gamma * (1 - dones[agent_idx]) * (q_targ[agent_idx] - alphas[agent_idx] * logp_next_obs[agent_idx]))
+                bellman_targ = rewards[idx] + self.gamma * (1 - dones[idx]) * (q_targ[idx] - alphas[idx] * logp_next_obs[idx])
+                bellman.append(bellman_targ)
+            # last critic is compared to first in sequence, with next state (which is used in Q value calculation, see getSequentialQs())
+            bellman_targ = rewards[0] + self.gamma * (1 - dones[0]) * (q_targ[0] - alphas[0] * logp_next_obs[0])
+            bellman.append(bellman_targ)
         
         # loss for each critic (except last) based on comparison to next in sequence
-        for agent_idx in range(self.nr_agents - 1):
+        for agent_idx in range(self.nr_agents):
             loss_critic1 = functional.mse_loss(q1[agent_idx], bellman[agent_idx])
             loss_critic2 = functional.mse_loss(q2[agent_idx], bellman[agent_idx])
             loss_critic = loss_critic1 + loss_critic2
@@ -284,24 +295,25 @@ class Agents:
             self.critics1[agent_idx].optimizer.step()
             self.critics2[agent_idx].optimizer.step()
 
-        # last critic is comparison between first and last in sequence, but with next state
-        
-
         for agent_idx in range(self.nr_agents):
             # ACTOR GRADIENT
             # first freeze critic gradient calculation to save computation
-            for params in self.critic1.parameters():
+            for params in self.critics1[agent_idx].parameters():
                 params.requires_grad = False
-            for params in self.critic2.parameters():
+            for params in self.critics2[agent_idx].parameters():
                 params.requires_grad = False
 
             # compute Q-values
-            # for this we need set of actions of all agents, where the gradient graph only
-            #   persists of the action of the current actor
-            pi_action_set = torch.column_stack([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
-                                                in enumerate(zip(pi_actions, pi_actions_nograd))])
-            q1_policy = self.critic1(obs_set, pi_action_set)
-            q2_policy = self.critic2(obs_set, pi_action_set)
+            #   Sequence of actions in sequential critic, where only the gradient graph of the current policy persists
+            if agent_idx == 0:
+                seq_actions = pi_actions[0]
+            else:
+                seq_actions = torch.column_stack((torch.column_stack(pi_act_nograd[:agent_idx]), pi_actions[agent_idx]))
+            # forward
+            print(obs_set.shape, seq_actions.shape)
+            q1_policy = self.critics1[agent_idx].forward(obs_set, seq_actions)
+            q2_policy = self.critics2[agent_idx].forward(obs_set, seq_actions)
+            
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
             q_policy = torch.minimum(q1_policy, q2_policy)
@@ -311,22 +323,22 @@ class Agents:
             # zero grad
             self.actors[agent_idx].optimizer.zero_grad()
             # backward prop
-            loss_policy.backward()
+            loss_policy.backward(retain_graph = True)
             # step down gradient
             self.actors[agent_idx].optimizer.step()
 
             # unfreeze critic gradients
-            for params in self.critic1.parameters():
+            for params in self.critics1[agent_idx].parameters():
                 params.requires_grad = True
-            for params in self.critic2.parameters():
+            for params in self.critics2[agent_idx].parameters():
                 params.requires_grad = True
 
             # Polyak averaging update
             with torch.no_grad():
-                for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
-                                                    self.critic2.parameters(),
-                                                    self.critic1_targ.parameters(),
-                                                    self.critic2_targ.parameters()):
+                for (p1, p2, p1_targ, p2_targ) in zip(self.critics1[agent_idx].parameters(),
+                                                      self.critics2[agent_idx].parameters(),
+                                                      self.critics1_targ[agent_idx].parameters(),
+                                                      self.critics2_targ[agent_idx].parameters()):
                     # critic1
                     p1_targ.data *= self.polyak
                     p1_targ.data += ((1 - self.polyak) * p1.data)
@@ -477,9 +489,12 @@ class Agents:
             if (step % checkpoint == 0):
                 for actor_idx in range(len(self.actors)):
                     self.actors[actor_idx].save(save_dir, "actor" + str(actor_idx) + "_" + str(step))
-                self.critic1.save(save_dir, "critic1" + "_" + str(step))
-                self.critic2.save(save_dir, "critic2" + "_" + str(step))
-                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
+                for critic_idx in range(len(self.critics1)):
+                    self.critics1[critic_idx].save(save_dir, "critic1" + str(critic_idx) + "_" + str(step))
+                    self.critics2[critic_idx].save(save_dir, "critic2" + str(critic_idx) + "_" + str(step))
+                for critic_targ_idx in range(len(self.critics2_targ)):
+                    self.critics1_targ[critic_targ_idx].save(save_dir, "critic1_targ" + str(critic_targ_idx) + "_" + str(step))
+                    self.critics2_targ[critic_targ_idx].save(save_dir, "critic2_targ" + str(critic_targ_idx) + "_" + str(step))
+
 
 
