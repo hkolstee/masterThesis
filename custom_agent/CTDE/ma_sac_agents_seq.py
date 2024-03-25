@@ -374,12 +374,18 @@ class Agents:
     def get_action(self, observations, reparameterize = True, deterministic = False):
         # get actor action
         action_list = []
+        seq_acts = torch.empty((observations[0].shape[0], 0))
         with torch.no_grad():
             for actor, obs in zip(self.actors, observations):
                 # make tensor and send to device
                 obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+                # input is observations plus preceding actor actions
+                stacked = torch.cat([obs, seq_acts], dim = 1)
                 # sample action from policy
-                actions, _ = actor.normal_distr_sample(obs, reparameterize, deterministic)
+                actions, _ = actor.normal_distr_sample(stacked, reparameterize, deterministic)
+                # add to next input
+                seq_acts = torch.cat([seq_acts, actions], dim = 1)
+
                 # add to list
                 action_list.append(actions.cpu().detach().numpy()[0])
 
