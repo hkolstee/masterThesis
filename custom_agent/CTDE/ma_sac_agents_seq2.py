@@ -115,9 +115,9 @@ class Agents:
         self.critics2_targ = deepcopy(self.critics2)
         # freeze parameter gradient calculation as it is not used
         for critic1_targ, critic2_targ in zip(self.critics1_targ, self.critics2_targ):
-            for params in self.critic1_targ.parameters():
+            for params in critic1_targ.parameters():
                 params.requires_grad = False
-            for params in self.critic2_targ.parameters():
+            for params in critic2_targ.parameters():
                 params.requires_grad = False
 
         # target entropy for automatic entropy coefficient adjustment, one per actor
@@ -137,7 +137,7 @@ class Agents:
         seq_acts = torch.empty((observations.shape[0], 0))
         seq_act_list = []
         logps_list = []
-        for actor in range(self.actors):
+        for actor in self.actors:
             # get action and logp
             stacked = torch.cat([observations, seq_acts], dim = 1)
             act, logp = actor.normal_distr_sample(stacked)
