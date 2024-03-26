@@ -10,13 +10,13 @@ $$
 \begin{align*}
     &A \sim \pi(\cdot| S; \theta)\\
     &\text{Take action } A \text{ observe } S', R\\
-    &\theta \leftarrow R + \gamma V(S'; \mathbf{w}) - V(S; \mathbf{w})\\
+    &\delta \leftarrow R + \gamma V(S'; \mathbf{w}) - V(S; \mathbf{w})\\
     &\mathbf{w} \leftarrow \mathbf{w} + \lambda^\mathbf{w} \delta \nabla V(S; \mathbf{w})\\
     &\theta \leftarrow \theta + \lambda^\theta I \delta \nabla \ln \pi (A | S; \theta)
 \end{align*}
 $$
 
-Where, if the policy is optimal, the left $(R + \gamma V(S'))$ and right $(V(S))$ hand side should cancel out, resulting in $\theta = 0$. This is by definition of the value function, where the value of the current state is the same as the reward gained from the transition to the next state plus the value of this next state.
+Where, if the policy is optimal, the left $(R + \gamma V(S'))$ and right $(V(S))$ hand side should cancel out, resulting in $\delta = 0$. This is by definition of the value function, where the value of the current state is the same as the reward gained from the transition to the next state plus the value of this next state.
 
 #### For an $m$-agent problem, we change this to:
 
@@ -24,8 +24,8 @@ $$
 \begin{align*}
     &A_1 \sim \pi_1 (\cdot | S; \theta_1), A_2 \sim \pi_2(\cdot | S, A_1; \theta_2), \ldots, A_m \sim \pi_m(\cdot | S, A_1, \ldots, A_{m-1};\theta_m)\\
     &\text{Take actions } A_1,\ldots,A_m \text{ observe } S', R\\
-    &\delta_i \leftarrow R + \gamma V_i(S, A_1, \ldots, A_{i-1}; \mathbf{w}_i) - V_{i-1}(S, A_1, \ldots, A_{i-2}; \mathbf{w}_{i-1}), &\text{for }i = 1, \ldots, m-1 \\
-    &\delta_m \leftarrow R(S, A_1, \ldots, A_m) + \gamma V_1(S'; \mathbf{w}_1) - V_{m-1}(S, A_1, \ldots, A_{m-1}; \mathbf{w}_{m-1})\\
+    &\delta_i \leftarrow R + \gamma V_{i+1}(S, A_1, \ldots, A_{i}; \mathbf{w}_i) - V_{i}(S, A_1, \ldots, A_{i-1}; \mathbf{w}_{i-1}), &\text{for }i = 1, \ldots, m-1 \\
+    &\delta_m \leftarrow R(S, A_1, \ldots, A_m) + \gamma V_1(S'; \mathbf{w}_1) - V_{m}(S, A_1, \ldots, A_{m-1}; \mathbf{w}_{m-1})\\
     &\mathbf{w}_i \leftarrow \mathbf{w}_i + \lambda^\mathbf{w}_i \delta_i \nabla V_i(S, A_1, \ldots, A_{i-1}; \mathbf{w}_i), &\text{for }i = 1, \ldots, m \\
     &\theta_i \leftarrow \theta_i + \lambda^{\theta_i} I \delta_i \nabla \ln \pi_i(A|S, A_1, \ldots, A_{i-1}), &\text{for }i = 1, \ldots, m \\\\
 \end{align*}
@@ -54,6 +54,7 @@ $$
 \begin{align*}
     &A \sim \pi(\cdot| S; \theta)\\
     &\text{Take action } A \text{ observe } S', R\\
+    &A' \sim \pi(\cdot| S'; \theta)\\
     &\mathbf{w}_i \leftarrow \mathbf{w}_i - \lambda^\mathbf{w_i} \nabla_\mathbf{w_i}J_Q(\mathbf{w}_i)  & \text{ for } i = 1, 2\\
     &\theta \leftarrow \theta - \lambda^\theta \nabla_\theta J_\pi(\theta)\\
     & \alpha \leftarrow \alpha - \lambda^\alpha \nabla_\alpha J(\alpha)\\
@@ -77,6 +78,7 @@ $$
 - $\mathcal{H}$: the entropy target, often taken as $-\text{dim} (\mathcal{A})$, where $\mathcal{A}$ is the action space.
 
 #### For an $m$-agent problem, we change this to:
+
 **Intuition:**
 Actor-Critic:
 $$
@@ -91,8 +93,8 @@ Simplified version of Soft Actor-Critic:
 
 $$
 \begin{align*}
-    & H = \alpha \log \pi (A|S)\\
-    & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - H))\\
+    & H(S) = \alpha \log \pi (S)\\
+    & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - H(S')))\\
     & J_\pi =  \alpha \log \pi(\tilde{A}(S|\theta) | S) - Q (S, \tilde{A}(S|\theta)) 
 \end{align*}
 $$
@@ -101,8 +103,8 @@ Therefore:
 
 $$
 \begin{align*}
-    & H_i = \alpha_i \log \pi_i (A_i|S)\\
-    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (R + \gamma(Q_{i+1}(S, A_1, \ldots, A_{i+1}) - H_{i+1}))\\
+    & H_i = \alpha_i \log \pi_i (S)\\
+    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (R + \gamma(Q_{i+1}(S, A_1, \ldots, A_{i+1}) - H_{i+1}(S)))\\
     & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R(S, A_1, \ldots, A_m) + \gamma(Q_1(S', A'_1) - H_1))\\
     & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta)) 
 \end{align*}
