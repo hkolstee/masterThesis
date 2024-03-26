@@ -374,8 +374,17 @@ class Agents:
     def get_action(self, observations, reparameterize = True, deterministic = False):
         # get actor action
         action_list = []
-        seq_acts = torch.empty((observations[0].shape[0], 0))
         with torch.no_grad():
+            # get global observation
+            # global_obs = torch.tensor(observations[0], dtype = torch.float32).unsqueeze(0).to(self.device)
+            # print(global_obs.shape)
+            # for obs in observations[1:]:
+                # global_obs = torch.column_stack((global_obs, torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)))
+            
+            # print(global_obs.shape)
+            
+            # sequential actions used as input in succeeding actors
+            seq_acts = torch.empty((1, 0))
             for actor, obs in zip(self.actors, observations):
                 # make tensor and send to device
                 obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
@@ -390,6 +399,36 @@ class Agents:
                 action_list.append(actions.cpu().detach().numpy()[0])
 
         return action_list
+    
+    # def get_action(self, observations, reparameterize = True, deterministic = False):
+    #     # get actor action
+    #     action_list = []
+    #     with torch.no_grad():
+    #         # get global observation
+    #         global_obs = torch.tensor(observations[0], dtype = torch.float32).unsqueeze(0).to(self.device)
+    #         print(global_obs.shape)
+    #         for obs in observations[1:]:
+    #             global_obs = torch.column_stack((global_obs, torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)))
+            
+    #         print(global_obs.shape)
+            
+    #         # sequential actions used as input in succeeding actors (empty with size (batch, 0))
+    #         seq_acts = torch.empty((global_obs.shape[0], 0))
+    #         for actor in self.actors:
+    #             # make tensor and send to device
+    #             # obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+    #             # input is observations plus preceding actor actions
+    #             stacked = torch.cat([global_obs, seq_acts], dim = 1)
+    #             print(stacked.shape)
+    #             # sample action from policy
+    #             actions, _ = actor.normal_distr_sample(stacked, reparameterize, deterministic)
+    #             # add to next input
+    #             seq_acts = torch.cat([seq_acts, actions], dim = 1)
+
+    #             # add to list
+    #             action_list.append(actions.cpu().detach().numpy()[0])
+
+    #     return action_list
     
     def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
               checkpoint = 100000, save_dir = "models"):
