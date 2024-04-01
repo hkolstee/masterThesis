@@ -18,7 +18,7 @@ $$
 
 Where, if the policy is optimal, the left $(R + \gamma V(S'))$ and right $(V(S))$ hand side should cancel out, resulting in $\delta = 0$. This is by definition of the value function, where the value of the current state is the same as the reward gained from the transition to the next state plus the value of this next state.
 
-#### For an $m$-agent problem, we change this to:
+#### For an $m$-agent problem, we change this to
 
 $$
 \begin{align*}
@@ -66,7 +66,7 @@ where:
 - $y(R,S', d)$: Critic target.
 - $\mathbf{w}$: Critic parameters (Two critics for clipped double Q, plus two target critics).
 - $\theta$: Actor parameters.
-- $\alpha$: Entropy temperature. 
+- $\alpha$: Entropy temperature.
 - $\tilde{A}(S|\theta)$: a sample from $\pi(\cdot | S; \theta)$ which is differentiable w.r.t. $\theta$ via the reparameterization trick:
 
 $$
@@ -95,7 +95,7 @@ $$
 \begin{align*}
     & H(S) = \alpha \log \pi (S)\\
     & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - H(S')))\\
-    & J_\pi =  \alpha \log \pi(\tilde{A}(S|\theta) | S) - Q (S, \tilde{A}(S|\theta)) 
+    & J_\pi =  \alpha \log \pi(\tilde{A}(S|\theta) | S) - Q (S, \tilde{A}(S|\theta))
 \end{align*}
 $$
 
@@ -106,7 +106,7 @@ $$
     & H_i = \alpha_i \log \pi_i (S)\\
     & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (R + \gamma(Q_{i+1}(S, A_1, \ldots, A_{i+1}) - H_{i+1}(S)))\\
     & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R(S, A_1, \ldots, A_m) + \gamma(Q_1(S', A'_1) - H_1))\\
-    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta)) 
+    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta))
 \end{align*}
 $$
 **Therefore:**
