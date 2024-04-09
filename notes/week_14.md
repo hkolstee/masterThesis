@@ -86,3 +86,5 @@ The agent-by-agent policy iteration converges to an agent-by-agent optimal polic
 Use precomputed substitute "guesses" $\hat{\mu_i}(x)$ in place of the preceding rollout controls $\tilde{\mu_i}(x)$. Signalling possibilities: use base policy controls for signaling (this may work poorly). Use a neural net representation of the rollout policy controls for signaling: $\hat{\mu_i}(x) \approx \tilde{\mu_i}(x)$, for all $i=1...m$.
 
 https://arxiv.org/pdf/2002.04175.pdf
+
+Important research question: Can perfect state info be replaced by state estimates?
