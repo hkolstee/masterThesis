@@ -31,6 +31,7 @@ class Actor(MultiLayerPerceptron):
         # clamping region, values taken from paper
         self.clamp_log_min = -20  # -5 also used
         self.clamp_log_max = 2
+
         
     def forward(self, obs):
         # output is probability distribution
@@ -66,7 +67,7 @@ class Actor(MultiLayerPerceptron):
         """
         return self.action_low + (0.5 * (scaled_action + 1.0) * (self.action_high - self.action_low))
 
-    def normal_distr_sample(self, obs, reparameterize = True, deterministic = False):
+    def action_distr_sample(self, obs, reparameterize = True, deterministic = False):
         mean, std = self.forward(obs)
         
         # get prob distribution

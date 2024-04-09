@@ -16,7 +16,7 @@ class MultiLayerPerceptron(nn.Module):
         output_size (int, tuple(int)): Output size
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, input_size, output_size, layer_sizes):
+    def __init__(self, lr, input_size, output_size, layer_sizes, optim_eps = 1e-08, weight_decay = 0):
         super(MultiLayerPerceptron, self).__init__()
         self.lr = lr
         self.input_size = input_size
@@ -56,7 +56,7 @@ class MultiLayerPerceptron(nn.Module):
             self.layers.append(layer)  
 
         # init optim
-        self.optimizer = optim.Adam(self.parameters(), lr = lr)
+        self.optimizer = optim.Adam(self.parameters(), lr = lr, eps=optim_eps, weight_decay=weight_decay)
 
         # init device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

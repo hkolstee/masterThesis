@@ -12,22 +12,24 @@ import torch.nn.functional as functional
 from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
 from custom_reward.custom_reward import CustomReward
 
+from gymnasium import spaces
+
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
 from ..SAC_components.replay_buffer import ReplayBuffer
-from ..SAC_components.critic import Critic
-from ..SAC_components.actor import Actor
+from ..SAC_components.critic_discrete import Critic
+from ..SAC_components.actor_discrete import DiscreteActor
 from ..SAC_components.logger import Logger
-from ..SAC_components.sac import SAC
+from ..SAC_components.autoencoder import AutoEncoder
 
 from copy import deepcopy
 
 from tqdm import tqdm
 
-class Agent(SAC):
+class Agent:
     """
     An Soft Actor-Critic agent.
 
@@ -52,10 +54,8 @@ class Agent(SAC):
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
+                 log_dir = "tensorboard_logs"
                  ):
-        # init sac base class (gradient functions)
-        super().__init__(gamma)
-        
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -66,18 +66,21 @@ class Agent(SAC):
         self.citylearn = isinstance(self.env.reward_function, CustomReward) if isinstance(self.env, CityLearnWrapper) else False
 
         # initialize tensorboard logger
-        self.logger = Logger(self.env)
+        self.logger = Logger(self.env, log_dir)
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+        act_size = env.action_space.n 
+        obs_size = env.observation_space.shape[0]
+
         # initialize replay buffer
         self.replay_buffer = ReplayBuffer(buffer_max_size, env.observation_space.shape, env.action_space.shape, batch_size)
-        
+
         # initialize networks
-        self.actor = Actor(lr_actor, env.observation_space.shape[0], env.action_space.shape[0], env.action_space.low, env.action_space.high, layer_sizes)
-        self.critic1 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
-        self.critic2 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
+        self.actor = DiscreteActor(lr_actor, obs_size, act_size)
+        self.critic1 = Critic(lr_critic, obs_size, act_size, layer_sizes)
+        self.critic2 = Critic(lr_critic, obs_size, act_size, layer_sizes)
 
         # make copy target critic networks which only get updated using polyak averaging
         self.critic1_targ = deepcopy(self.critic1)
@@ -88,11 +91,12 @@ class Agent(SAC):
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
 
-        # target entropy for automatic entropy coefficient adjustment
-        self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
+        # target entropy for automatic entropy coefficient adjustment (from cleanRL)
+        self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
         # the entropy coef alpha which is to be optimized
-        self.alpha = torch.ones(1, requires_grad = True, device = self.device)
-        self.alpha_optimizer = torch.optim.Adam([self.alpha], lr = lr_critic)   # shares critic lr
+        self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor
+        self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
+        self.alpha = torch.exp(self.log_alpha.detach())
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -119,37 +123,68 @@ class Agent(SAC):
             return 0, None, None, None, None, None
         
         # sample from buffer
-        obs, replay_actions, rewards, next_obs, dones = self.replay_buffer.sample()
+        obs, replay_act, rewards, next_obs, dones = self.replay_buffer.sample()
+        # print("obs", obs)
+        # print("ract", replay_act)
 
         # prepare tensors
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         next_obs = torch.tensor(next_obs, dtype=torch.float32).to(self.device)
-        replay_actions = torch.tensor(replay_actions, dtype=torch.float32).to(self.device)
+        replay_act = torch.tensor(replay_act, dtype=torch.float32).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
-        
+
         # compute current policy action for pre-transition observation
-        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
-        
+        _, log_prob_prev_obs, probs_prev_obs = self.actor.action_distr_sample(obs)
+        # print("p", probs_prev_obs)
+
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
+        #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
+        # we detach because otherwise we backward through the graph of previous calculations using log_prob
+        #   which also raises an error fortunately, otherwise I would have missed this
+        # alpha_loss = (-self.log_alpha * log_prob_prev_obs.detach() - self.log_alpha * self.entropy_targ).mean()
+        alpha_loss = (probs_prev_obs.detach() * (-self.log_alpha.exp() * log_prob_prev_obs.detach() - self.log_alpha.exp() * self.entropy_targ)).mean()
+        
+        # backward prop + gradient step
         self.alpha_optimizer.zero_grad()
-        # alpha_loss = (-self.alpha * log_prob_prev_obs.detach() - self.alpha * self.entropy_targ).detach().mean()
-        alpha_loss = self.alphaLoss(self.alpha, log_prob_prev_obs, self.entropy_targ)
         alpha_loss.backward()
         self.alpha_optimizer.step()   
 
+        # get next alpha
+        self.alpha = torch.exp(self.log_alpha.detach())
+
         # CRITIC GRADIENT
-        # reset gradients
+        # These Q values are the left hand side of the loss function
+        q1_buffer = self.critic1.forward(obs)
+        q2_buffer = self.critic2.forward(obs)
+        
+        # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
+        with torch.no_grad():
+            # targets from current policy (old policy = buffer)
+            _, log_prob_next_obs, probs_next_obs = self.actor.action_distr_sample(next_obs)
+
+            # target q values
+            q1_policy_targ = self.critic1_targ.forward(next_obs)
+            q2_policy_targ = self.critic2_targ.forward(next_obs)
+            # Clipped double Q trick
+            # Action probabilities can be used to estimate the expectation (cleanRL)
+            q_targ =  (probs_next_obs * (torch.minimum(q1_policy_targ, q2_policy_targ) - self.alpha.unsqueeze(1) * log_prob_next_obs)).sum(dim = 1)
+            # Bellman approximation
+            bellman = rewards + self.gamma * (1 - dones) * (q_targ)
+
+        # use only Q-values of the chosen action
+        q1_buffer = q1_buffer.gather(1, replay_act.long().unsqueeze(1)).squeeze()
+        q2_buffer = q2_buffer.gather(1, replay_act.long().unsqueeze(1)).squeeze()
+
+        # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
+        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
+        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
+
+        # backward prop + gradient step
         self.critic1.optimizer.zero_grad()
         self.critic2.optimizer.zero_grad()
-        
-        # calculate loss
-        loss_critic = self.criticLoss(self.actor, self.critic1, self.critic2, self.critic1_targ, 
-            self.critic2_targ, self.alpha, obs, replay_actions, next_obs, dones, rewards)
-
-        # backward prop
         loss_critic.backward()
-        # step down gradient
         self.critic1.optimizer.step()
         self.critic2.optimizer.step()
 
@@ -160,16 +195,19 @@ class Agent(SAC):
         for params in self.critic2.parameters():
             params.requires_grad = False
 
-        # reset actor gradient
+        # compute Q-values
+        q1_policy = self.critic1.forward(obs)
+        q2_policy = self.critic2.forward(obs)
+        # take min of these two 
+        #   = clipped Q-value for stable learning, reduces overestimation
+        q_policy = torch.minimum(q1_policy, q2_policy)
+        # entropy regularized loss
+        # no need for reparameterization, the expectation can be calculated for discrete actions (cleanRL)
+        loss_policy = (probs_prev_obs * (self.alpha.unsqueeze(1) * log_prob_prev_obs - q_policy)).mean()
+
+        # backward prop + gradient step
         self.actor.optimizer.zero_grad()
-
-        # calculate actor loss
-        loss_policy = self.actorLoss(self.actor, self.critic1, self.critic2, self.alpha, obs,
-                                     policy_act_prev_obs, log_prob_prev_obs)
-
-        # backward prop
         loss_policy.backward()
-        # step down gradient
         self.actor.optimizer.step()
 
         # unfreeze critic gradients
@@ -201,15 +239,17 @@ class Agent(SAC):
 
     def get_action(self, obs, reparameterize = True, deterministic = False):
         # make tensor and send to device
-        obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+        if not isinstance(obs, torch.Tensor):
+            obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
-            actions, _ = self.actor.normal_distr_sample(obs, reparameterize, deterministic)
+            action, _, _ = self.actor.action_distr_sample(obs, reparameterize, deterministic)
 
-        return actions.cpu().detach().numpy()[0]
+        return np.argmax(action.cpu().detach().numpy()[0])
     
-    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50):
+    def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
+              checkpoint = 100000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -244,14 +284,19 @@ class Agent(SAC):
             else: 
                 # get action
                 action = self.get_action(obs)
+                # print(action)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(action)
-            
+
             # step increment 
             ep_steps += 1
             # reward addition to total sum
             ep_rew_sum += reward
+
+            # set done to false if signal is because of time horizon (spinning up)
+            if ep_steps == max_episode_len:
+                done = False
 
             # add transition to buffer
             self.replay_buffer.add_transition(obs, action, reward, next_obs, done)
@@ -261,7 +306,6 @@ class Agent(SAC):
 
             # done or max steps
             if (done or truncated or ep_steps == max_episode_len):
-                print(ep_rew_sum)
                 ep += 1
 
                 # avg losses and entropy
@@ -279,8 +323,9 @@ class Agent(SAC):
                             "avg_policy_entr": avg_policy_entr}
                     self.logger.log(logs, step, group = "train")
                 # log reward seperately
-                reward_log = {"reward_sum": ep_rew_sum}
-                self.logger.log(reward_log, step, "Reward")
+                rollout_log = {"reward_sum": ep_rew_sum,
+                               "ep_len": ep_steps}
+                self.logger.log(rollout_log, step, "rollout")
 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
                 if self.citylearn:
@@ -316,3 +361,11 @@ class Agent(SAC):
                         ep_entr_sum += policy_entropy
                         ep_alpha_sum += alpha
                         ep_alphaloss_sum += loss_alpha
+                        
+            # checkpoint
+            if (step % checkpoint == 0):
+                self.actor.save(save_dir, "actor" + "_" + str(step))
+                self.critic1.save(save_dir, "critic1" + "_" + str(step))
+                self.critic2.save(save_dir, "critic2" + "_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))

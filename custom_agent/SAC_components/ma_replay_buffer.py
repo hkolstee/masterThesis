@@ -46,13 +46,13 @@ class MultiAgentReplayBuffer:
             dones (list (int)): List of agents' done boolean
         """
         index = self.update_index()
-        
-        for agent_nr, (o, a, r, n_o) in enumerate(zip(obs, actions, rewards, next_obs)):
+
+        for agent_nr, (o, a, r, n_o, d) in enumerate(zip(obs, actions, rewards, next_obs, done)):
             self.obs_buffer[agent_nr][index] = o
             self.next_obs_buffer[agent_nr][index] = n_o
             self.action_buffer[agent_nr][index] = a
             self.reward_buffer[agent_nr][index] = r
-            self.done_buffer[agent_nr][index] = done
+            self.done_buffer[agent_nr][index] = d
         
     def sample(self):
         """

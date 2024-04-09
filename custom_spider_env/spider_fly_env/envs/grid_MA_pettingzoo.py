@@ -1,17 +1,20 @@
 import numpy as np
-# import pygame
+
 import copy
 import time
 import sys
+import functools
 
 import gymnasium as gym
 from gymnasium import spaces
+
+from pettingzoo import ParallelEnv
 
 FLY = 2
 SPIDER = 1
 EMPTY = 0
 
-class SpiderFlyEnv(gym.Env):
+class SpiderFlyEnvMA(ParallelEnv):
     """
     This environment is a 2-dimensional grid, modelling the spider-and-fly 
     problem illustrated in the paper:
@@ -29,15 +32,16 @@ class SpiderFlyEnv(gym.Env):
     transition to the next state will cost 1, until the fly is caught, then the
     cost becomes 0. 
     """
-    metadata = {"render_modes": ["ascii"]}
+    metadata = {"name": "SpiderFlyGridMA-v0",
+                "render_modes": ["ascii"]}
 
-    def __init__(self, size = 5, spiders = 4, max_timesteps = 1000, render_mode = None):
+    def __init__(self, size = 5, spiders = 4, flies = 1, max_timesteps = 1000, render_mode = None):
         super().__init__()
         self.size = size
         self.nr_spiders = spiders
-        self.nr_flies = 1
-        self.max_steps = max_timesteps
+        self.nr_flies = flies
         self.timestep = 0
+        self.max_steps = max_timesteps
 
         # grid locations are integers [x,y], x,y in [0,..,size - 1].
         # each spider sees all spider locations and fly location
@@ -45,8 +49,16 @@ class SpiderFlyEnv(gym.Env):
 
         # multi-agent observations, agent (spider) gets all spider locs + fly loc
         # action space is 5 (left, right, up, down, nothing) for each spider
-        self.observation_space = spider_obs
-        self.action_space = spaces.MultiDiscrete(np.repeat(5, self.nr_spiders))
+        self.observation_spaces = dict()
+        self.action_spaces = dict()
+        self.agents = list()
+        for agent_idx in range(self.nr_spiders):
+            # agent name string
+            agent = "spider_" + str(agent_idx)
+
+            self.observation_spaces[agent] = copy.deepcopy(spider_obs)
+            self.action_spaces[agent] = spaces.Discrete(5)
+            self.agents.append(agent)
 
         # mapping from action to direction of this action on the grid (=delta (x, y))
         self._action_to_direction = {
@@ -69,12 +81,28 @@ class SpiderFlyEnv(gym.Env):
             EMPTY: ' ',
         }
 
+        # possible agent string name list needed for pettingzoo api
+        self.possible_agents = [a for a in self.agents]
+
         # reset
         self.reset()
 
+    # lru_cache allows observation and action spaces to be memoized, reducing clock cycles required to get each agent's space.
+    @functools.lru_cache(maxsize=None)
+    def observation_space(self, agent):
+        return self.observation_spaces[agent]
+    
+    # Action space defined here.
+    @functools.lru_cache(maxsize=None)
+    def action_space(self, agent):
+        return self.action_spaces[agent]
+
     def _get_obs(self):
-        # flattens by itself
-        return np.append(self._spider_locations, self._fly_location)
+        # append flattens by itself
+        return {a: list(np.append(self._spider_locations, self._fly_location)) for a in self.possible_agents}
+
+    def _get_spider_locations(self):
+        return {a: self._spider_locations[agent_idx] for (agent_idx, a) in enumerate(self.agents)}
     
     def _create_state_matrix(self):
         self._state = np.zeros((self.size, self.size))
@@ -95,12 +123,9 @@ class SpiderFlyEnv(gym.Env):
         # print char array
         print(content)
 
-    def reset(self, seed = None, render = False):
-        # seed self.np_random
-        super().reset(seed = seed)
-
-        # reset timesteps
-        self.timestep = 0
+    def reset(self, seed = None, options = None):
+        # set np random seed
+        self.rng = np.random.default_rng(seed = seed)
 
         # random spider/fly locations 
         spawn_locs = set()
@@ -108,15 +133,15 @@ class SpiderFlyEnv(gym.Env):
         # random spider locations but can't already be a location of another spider
         # set() because faster (eventhough its not needed)
         for _ in range(self.nr_spiders):
-            loc = self.np_random.integers(0, self.size, size = (2,))
+            loc = self.rng.integers(0, self.size, size = (2,))
             while tuple(loc) in spawn_locs:
-                loc = self.np_random.integers(0, self.size, size = (2,))
+                loc = self.rng.integers(0, self.size, size = (2,))
             spawn_locs.add(tuple(loc))
             self._spider_locations.append(loc)
         # fly also has to spawn on a free space
-        loc = self.np_random.integers(0, self.size, size = (2,))
+        loc = self.rng.integers(0, self.size, size = (2,))
         while tuple(loc) in spawn_locs:
-            loc = self.np_random.integers(0, self.size, size = (2,))
+            loc = self.rng.integers(0, self.size, size = (2,))
         self._fly_location = loc
         
         # get observations
@@ -125,11 +150,14 @@ class SpiderFlyEnv(gym.Env):
         # create state matrix
         self._create_state_matrix()
 
-        if self.render_mode == "ascii" and render:
+        if self.render_mode == "ascii":
             # print grid, spiders, and flies 
             self._print_state_matrix()
 
-        return observations, {}
+        # info is necessary like this
+        infos = {a: {} for a in self.possible_agents}
+
+        return observations, infos
     
     def take_action(self, spider_idx, action):
         """
@@ -155,7 +183,7 @@ class SpiderFlyEnv(gym.Env):
                     self._spider_locations[spider_idx] = new_loc
 
     def move_fly(self):
-        new_loc = self._fly_location + self._action_to_direction[np.random.randint(0, 5)]
+        new_loc = self._fly_location + self._action_to_direction[self.rng.integers(0, 5)]
         # check within walls
         if all((coord >= 0 and coord < self.size) for coord in new_loc):
             # check not on other spider
@@ -191,8 +219,8 @@ class SpiderFlyEnv(gym.Env):
         # Move each spider in a legal manner, if an illigal move is done, the
         # spider does nothing. The spiders move sequentially, so the new 
         # position of the previous spider will be used for deciding illigality.
-        for idx, action in enumerate(actions):
-            self.take_action(idx, action.squeeze())
+        for idx, (agent, action) in enumerate(actions.items()):
+            self.take_action(idx, action)
 
         # render
         if self.render_mode == "ascii":
@@ -203,36 +231,32 @@ class SpiderFlyEnv(gym.Env):
 
         # get reward, each step 
         if terminal:
-            reward = 1
-            self.reset(render = False)
+            rewards = {a: 1 for a in self.possible_agents}
+            self.reset()
         else:
-            reward = 0.001 * (occupied_sides - 4)
-
-        # truncations
-        if self.max_steps == self.timestep:
-            truncation = True
-            self.timestep = 0
-        else:
-            truncation = False
+            rewards = {a: 0.001 * (occupied_sides - 4) for a in self.possible_agents}
 
         # get observation
         observations = self._get_obs()
+        # infos
+        infos = {a: {} for a in self.possible_agents}
+        # terminals
+        terminals = {a: terminal for a in self.possible_agents}
+        # truncations
+        if self.max_steps == self.timestep:
+            truncations = {a: True for a in self.possible_agents}
+            self.timestep = 0
+        else:
+            truncations = {a: False for a in self.possible_agents}
 
-        # add timestep
-        self.timestep = 0
+        # also needed for pettingzoo api
+        if any(terminals.values()) or all(truncations.values()):
+            self.agents = []
+
+        # add step to counter
+        self.timestep += 1
 
         # return obs, rew, done, truncated, info
-        return observations, reward, terminal, truncation, {}
-
-        
-# # env = SpiderFlyEnv()
-# env = SpiderFlyEnv(render_mode = "ascii", multiagent=False)
-# rewards = 0
-# for i in range(100000):
-#     obs, rew, term, _, _ = env.step(np.random.randint(0,5, (env.nr_spiders,)))
-#     rewards += rew
-#     if term:
-#         print(i, rewards)
-#         break
+        return observations, rewards, terminals, truncations, infos
 
 

@@ -26,13 +26,12 @@ class Critic(MultiLayerPerceptron):
     """
     def __init__(self, lr, obs_size, actions_size, layer_sizes = (256, 256)):
         super().__init__(lr = lr,
-                         input_size = obs_size + actions_size, 
-                         output_size = 1, 
-                         layer_sizes = layer_sizes)
+                         input_size = obs_size, 
+                         output_size = actions_size, 
+                         layer_sizes = layer_sizes,
+                         eps = 1e-4)
         
-    def forward(self, obs, action):
-        # print(obs.shape, action.shape)
-        input = torch.cat([obs, action], dim = -1).float()
-        out = super().forward(input)[0]
+    def forward(self, obs):
+        out = super().forward(obs.float())[0]
                 
-        return out.squeeze(-1)
+        return out
