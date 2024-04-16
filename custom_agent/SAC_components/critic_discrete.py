@@ -24,12 +24,12 @@ class Critic(MultiLayerPerceptron):
         action_size (int): Actions size
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, actions_size, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, act_size, layer_sizes = (256, 256), optim_eps = 1e-4):
         super().__init__(lr = lr,
                          input_size = obs_size, 
-                         output_size = actions_size, 
+                         output_size = act_size, 
                          layer_sizes = layer_sizes,
-                         eps = 1e-4)
+                         optim_eps = optim_eps)
         
     def forward(self, obs):
         out = super().forward(obs.float())[0]

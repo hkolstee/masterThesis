@@ -19,17 +19,17 @@ class DiscreteActor(MultiLayerPerceptron):
             such that we get the appropriate action value
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, action_size, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, act_size, layer_sizes = (256, 256), eps = 1e-4):
         super().__init__(lr = lr,
                          input_size = obs_size, 
-                         output_size = action_size, 
+                         output_size = act_size, 
                          layer_sizes = layer_sizes,
-                         eps = 1e-4)
+                         optim_eps = eps)
         # gumbel temperature (tau)
         self.gumbel_temperature = 1.0
 
         # action list to take dot product with onehot action vector
-        self.action_categories = torch.tensor([i for i in range(action_size)], dtype = torch.float32)
+        self.action_categories = torch.tensor([i for i in range(act_size)], dtype = torch.float32)
 
     def set_gumbel_temperature(self, temperature):
         self.gumbel_temperature = temperature

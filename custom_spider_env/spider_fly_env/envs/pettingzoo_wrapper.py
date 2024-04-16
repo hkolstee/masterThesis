@@ -27,6 +27,7 @@ class PettingZooWrapper(Wrapper):
         observations, _ = self.env.reset()
 
         return list(observations.values()), {}
+
     
     def step(self, actions):
         """
