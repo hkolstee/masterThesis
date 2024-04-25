@@ -32,7 +32,7 @@ class Critic(MultiLayerPerceptron):
         
     def forward(self, obs, action):
         # print(obs.shape, action.shape)
-        input = torch.cat([obs, action], dim = -1).float()
+        input = torch.cat([obs, action], dim = 1).float()
         out = super().forward(input)[0]
                 
         return out.squeeze(-1)

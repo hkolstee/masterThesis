@@ -93,8 +93,7 @@ Simplified version of Soft Actor-Critic:
 
 $$
 \begin{align*}
-    & H(S) = \alpha \log \pi (S)\\
-    & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - H(S')))\\
+    & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - \alpha \log \pi (S'))) \quad\quad\quad \text{where: } \pi(S') = A'\\
     & J_\pi =  \alpha \log \pi(\tilde{A}(S|\theta) | S) - Q (S, \tilde{A}(S|\theta))
 \end{align*}
 $$
@@ -103,10 +102,9 @@ Therefore:
 
 $$
 \begin{align*}
-    & H_i = \alpha_i \log \pi_i (S)\\
-    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (R + \gamma(Q_{i+1}(S, A_1, \ldots, A_{i+1}) - H_{i+1}(S)))\\
-    & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R(S, A_1, \ldots, A_m) + \gamma(Q_1(S', A'_1) - H_1))\\
-    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta))
+    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (Q_{i+1}(S, A_1, \ldots, A_{i+1}) - \alpha_{i+1} \log \pi_{i+1} (S, A_1, \cdots, A_{i-1}))\\
+    & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R + \gamma(Q_{m}(S, A_1, \ldots, A_m) + \gamma(Q_1(S', A'_1) - \alpha_i \log \pi_i (S))))\\
+    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S, A_1, \cdots, A_{i-1}) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta))
 \end{align*}
 $$
 **Therefore:**
@@ -115,10 +113,10 @@ For each stage $i$ in the sequential $Q$-calculation, from $i = 1, \ldots,m$, we
 
 $$
 \begin{align*}
-    &y_i(R_i, S, d_i) = R_i + \gamma(1 - d_i) \left ( \min_{k=1,2}Q^{targ}_{i,k}(S, A_1, \ldots, A_{i}; \mathbf{w}^{targ}_{i,k}) - \alpha_i \log \pi_i (A_i|S, A_1, \ldots, A_{i-1}; \theta_i) \right)\\
-    &y_m(R_m, S', d_i) = R_m + \gamma(1 - d_i) \left ( \min_{k=1,2}Q^{targ}_{1,k}(S', A'_1; \mathbf{w}^{targ}_{1,k}) - \alpha_1 \log \pi_1 (A'_1|S'; \theta_1) \right), & A'_i \sim \pi_i(\cdot| S', A'_1, \ldots, A'_{i-1})\\
-    &J_{Q_i} (\mathbf{w}_i) = \frac{1}{2}\sum_{k=1,2}(Q_{i, k}(S, A_1, \ldots, A_{i}; \mathbf{w}_{i, k}) - y_{i+1}(R_i, S, d_i))^2 \\
-    &J_{Q_m} (\mathbf{w}_m) = \frac{1}{2}\sum_{k=1,2}(Q_{m, k}(S, A_1, \ldots, A_m; \mathbf{w}_m) - y_{m}(R_m, S', d_m))^2\\
+    &y_i(R_i, S) =  \min_{k=1,2}Q^{targ}_{i,k}(S, A_1, \ldots, A_{i}; \mathbf{w}^{targ}_{i,k}) - \alpha_i \log \pi_i (A_i|S, A_1, \ldots, A_{i-1}; \theta_i) \\
+    &y_m(R, S', d) = R + \gamma(1 - d_i) \left ( \min_{k=1,2}Q^{targ}_{1,k}(S', A'_1; \mathbf{w}^{targ}_{1,k}) - \alpha_1 \log \pi_1 (A'_1|S'; \theta_1) \right), & A'_i \sim \pi_i(\cdot| S', A'_1, \ldots, A'_{i-1})\\
+    &J_{Q_i} (\mathbf{w}_i) = \frac{1}{2}\sum_{k=1,2}(Q_{i, k}(S, A_1, \ldots, A_{i}; \mathbf{w}_{i, k}) - y_{i+1}(R_i, S))^2 \\
+    &J_{Q_m} (\mathbf{w}_m) = \frac{1}{2}\sum_{k=1,2}(Q_{m, k}(S, A_1, \ldots, A_m; \mathbf{w}_m) - y_{m}(R, S', d))^2\\
     &J_{\pi_i}(\theta_i) =  \alpha_i \log \pi_i(\tilde{A}(S|\theta) | S, A_1, \ldots, A_{i-1}; \theta) - \min_{k=1,2} Q_{i,k} (S, A_1, \ldots, A_{i-1}, \tilde{A}_i(S|\theta); \mathbf{w})  \\
     &J(\alpha_i) = -\alpha_i (\log\pi_i(A_i|S, A_1, \ldots, A_{i-1}) + \mathcal{H_i})\\
 \end{align*}
@@ -142,5 +140,34 @@ $$
     &\theta_i \leftarrow \theta_i - \lambda^{\theta_i} \nabla_{\theta_i} J_{\pi_i}(\theta_i) & \text{ for } i = 1, \ldots, m\\
     & \alpha_i \leftarrow \alpha_i - \lambda{^\alpha_i} \nabla_{\alpha_i} J(\alpha_i) & \text{ for } i = 1, \ldots, m\\
     &\mathbf{w}^{targ}_{i,k} \leftarrow \rho \mathbf{w}^{targ}_{i,k} + (1 - \rho)\mathbf{w}_{i,k}, & \text{ for } k = 1, 2, \text{ and } i = 1, \ldots, m\\
+\end{align*}
+$$
+
+### UPDATE
+$$
+\begin{align*}
+    & J_Q = Q(S, A) - (R + \gamma(Q(S', A') - \alpha \log \pi (S'))) \quad\quad\quad \text{where: } \pi(S') = A'\\
+    & J_\pi =  \alpha \log \pi(\tilde{A}(S|\theta) | S) - Q (S, \tilde{A}(S|\theta))
+\end{align*}
+$$
+
+Therefore:
+
+$$
+\begin{align*}
+    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (Q_{i+1}(S, A_1, \ldots, A_{i+1}) - \alpha_{i+1} \log \pi_{i+1} (S, A_1, \ldots, A_{i-1}))\\
+    & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R + \gamma(Q_{m}(S, A_1, \ldots, A_m) + \gamma(Q_1(S', A'_1) - \alpha_1 \log \pi_1 (S'))))\\
+    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S, A_1, \ldots, A_{i-1}) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta))
+\end{align*}
+$$
+
+To:
+
+$$
+\begin{align*}
+    & J_{Q_i} = Q_{i}(S, A_1, \ldots, A_{i}) - (Q_{i+1}(S, A_1, \ldots, A_i, \pi_{i+1}(S, A_1, ..., A_i)) - \alpha_{i+1} \log \pi_{i+1} (S, A_1, ..., A_i))\\
+    & J_{Q_m} = Q_{m}(S, A_1, \ldots, A_{m}) - (R + \gamma * (Q_1(S', \pi_1(S')) - \alpha_1 \log \pi_1 (S')))\\
+    & J_{\pi_i} =  \alpha_i \log \pi_i(\tilde{A_i}(S|\theta) | S, A_1, \ldots, A_{i-1}) - Q_i(S,A_1, \ldots, A_{i-1}, \tilde{A}(S|\theta))\\
+    & J(\alpha_i) = -\alpha_i (\log\pi_i(A_i|S, A_1, \ldots, A_{i-1}) + \mathcal{H_i})\\
 \end{align*}
 $$

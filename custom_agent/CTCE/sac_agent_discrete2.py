@@ -6,7 +6,7 @@ import pandas as pd
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
+import torch.nn.functional as F
 
 # temporary needed
 from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
@@ -71,7 +71,7 @@ class Agent:
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        act_size = env.action_space.n - 1
+        act_size = env.action_space.n 
         obs_size = env.observation_space.shape[0]
 
         # initialize replay buffer
@@ -91,8 +91,8 @@ class Agent:
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
 
-        # target entropy for automatic entropy coefficient adjustment
-        self.entropy_targ = -torch.prod(torch.Tensor(self.env.action_space.shape).to(self.device)).item()
+        # target entropy for automatic entropy coefficient adjustment (from cleanRL)
+        self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
         # the entropy coef alpha which is to be optimized
         self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor
         self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
@@ -124,19 +124,16 @@ class Agent:
         
         # sample from buffer
         obs, replay_act, rewards, next_obs, dones = self.replay_buffer.sample()
-        # print("obs", obs)
-        # print("ract", replay_act)
 
         # prepare tensors
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
         next_obs = torch.tensor(next_obs, dtype=torch.float32).to(self.device)
-        replay_act = torch.tensor(replay_act, dtype=torch.float32).to(self.device)
+        replay_act = torch.tensor(replay_act, dtype=torch.int64).to(self.device)
         rewards = torch.tensor(rewards, dtype=torch.float32).to(self.device)
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
         # compute current policy action for pre-transition observation
-        act_prev_obs, log_prob_prev_obs = self.actor.action_distr_sample(obs)
-        # print("p", probs_prev_obs)
+        act_prev_obs, log_prob_prev_obs, _ = self.actor.action_distr_sample(obs)
 
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
@@ -155,26 +152,30 @@ class Agent:
 
         # CRITIC GRADIENT
         # These Q values are the left hand side of the loss function
-        q1_buffer = self.critic1.forward(obs, replay_act.unsqueeze(1))
-        q2_buffer = self.critic2.forward(obs, replay_act.unsqueeze(1))
+        # replay actions are in index values, we need to convert to onehot
+        replay_act_input = F.one_hot(replay_act)
+        q1_buffer = self.critic1.forward(obs, replay_act_input)
+        q2_buffer = self.critic2.forward(obs, replay_act_input)
         
         # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
         with torch.no_grad():
             # targets from current policy (old policy = buffer)
-            act_next_obs, log_prob_next_obs = self.actor.action_distr_sample(next_obs)
+            act_next_obs, log_prob_next_obs, probs_next_obs = self.actor.action_distr_sample(next_obs)
 
             # target q values
             q1_policy_targ = self.critic1_targ.forward(next_obs, act_next_obs)
             q2_policy_targ = self.critic2_targ.forward(next_obs, act_next_obs)
             # Clipped double Q trick
+            min_q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
             # Action probabilities can be used to estimate the expectation (cleanRL)
-            q_targ =  torch.minimum(q1_policy_targ, q2_policy_targ)
+            q_targ =  min_q_targ - self.alpha * log_prob_next_obs
             # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
+            # print(rewards.shape, dones.shape, q_targ.shape)
+            bellman = rewards + self.gamma * (1 - dones) * q_targ
 
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-        loss_critic1 = functional.mse_loss(q1_buffer, bellman)
-        loss_critic2 = functional.mse_loss(q2_buffer, bellman)
+        loss_critic1 = F.mse_loss(q1_buffer, bellman)
+        loss_critic2 = F.mse_loss(q2_buffer, bellman)
         loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
 
         # backward prop + gradient step
@@ -199,7 +200,7 @@ class Agent:
         q_policy = torch.minimum(q1_policy, q2_policy)
         # entropy regularized loss
         # no need for reparameterization, the expectation can be calculated for discrete actions (cleanRL)
-        loss_policy = (self.alpha * log_prob_prev_obs - q_policy).mean()
+        loss_policy = (self.alpha.unsqueeze(1) * log_prob_prev_obs - q_policy).mean()
 
         # backward prop + gradient step
         self.actor.optimizer.zero_grad()
@@ -240,7 +241,7 @@ class Agent:
 
         # get actor action
         with torch.no_grad():
-            action, _ = self.actor.action_distr_sample(obs, reparameterize, deterministic)
+            action, _, _ = self.actor.action_distr_sample(obs, reparameterize, deterministic)
 
         return np.argmax(action.cpu().detach().numpy()[0])
     

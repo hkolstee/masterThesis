@@ -50,41 +50,11 @@ class DiscreteActor(MultiLayerPerceptron):
 
         action_probs = prob_distr.probs
 
-        log_prob = functional.log_softmax(action_logits, dim = 1)
-
-        # the normal prob distribution
-        # action_softmax = functional.softmax(action_logits, dim = 1)
-        # categorical distribution
-        # prob_distr = torch.distributions.OneHotCategorical(action_softmax)
-
-        # if reparameterize:
-        #     # to use the reparameterization trick instead
-        #     # of the stochastic sampling process that stops
-        #     # gradients, we can use the gumbel softmax
-        #     # which introduces noise as a linear combination
-        #     # to sample from the distribution.
-        #     action = functional.gumbel_softmax(action_logits, hard = True, tau = self.gumbel_temperature, dim = 1)
-        #     # one_hot_action = functional.gumbel_softmax(action_logits, hard = True, tau = self.gumbel_temperature, dim = 1)
-            
-        #     # convert one_hot_action into integer
-        #     # action = torch.matmul(one_hot_action, self.action_categories)
-        # else:            
-        #     if deterministic:
-        #         action = torch.argmax(prob_distr.probs)
-        #     else:
-        #         action = prob_distr.sample()
-
-        # log of the prob_distr function evaluated at sample value
-        # log_prob = prob_distr.log_prob(action)
-        # log_prob = log_prob.sum(axis = -1)
+        # avoid instability
+        z = (action_probs == 0.0).float() * 1e-8
+        log_prob = torch.log(action_probs + z)
 
         # final action
         action = action.to(self.device) # should be on device
 
         return action, log_prob, action_probs
-    
-# a = DiscreteActor(0.0003, 4, 5)
-
-# action = a.action_distr_sample(torch.tensor([[0.3, 0.3, 0.3, 0.3]]))
-
-# print(action)

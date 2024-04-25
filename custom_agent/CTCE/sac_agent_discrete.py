@@ -92,7 +92,8 @@ class Agent:
             params.requires_grad = False
 
         # target entropy for automatic entropy coefficient adjustment (from cleanRL)
-        self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
+        # self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
+        self.entropy_targ = -act_size
         # the entropy coef alpha which is to be optimized
         self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor
         self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
@@ -167,8 +168,9 @@ class Agent:
             q1_policy_targ = self.critic1_targ.forward(next_obs)
             q2_policy_targ = self.critic2_targ.forward(next_obs)
             # Clipped double Q trick
+            min_q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
             # Action probabilities can be used to estimate the expectation (cleanRL)
-            q_targ =  (probs_next_obs * (torch.minimum(q1_policy_targ, q2_policy_targ) - self.alpha.unsqueeze(1) * log_prob_next_obs)).sum(dim = 1)
+            q_targ =  (probs_next_obs * (min_q_targ - self.alpha.unsqueeze(1) * log_prob_next_obs)).sum(dim = 1)
             # Bellman approximation
             bellman = rewards + self.gamma * (1 - dones) * (q_targ)
 
@@ -203,7 +205,7 @@ class Agent:
         q_policy = torch.minimum(q1_policy, q2_policy)
         # entropy regularized loss
         # no need for reparameterization, the expectation can be calculated for discrete actions (cleanRL)
-        loss_policy = (probs_prev_obs * (self.alpha.unsqueeze(1) * log_prob_prev_obs - q_policy)).mean()
+        loss_policy = (probs_prev_obs * (self.alpha.unsqueeze(1) * log_prob_prev_obs - q_policy)).sum(1).mean()
 
         # backward prop + gradient step
         self.actor.optimizer.zero_grad()

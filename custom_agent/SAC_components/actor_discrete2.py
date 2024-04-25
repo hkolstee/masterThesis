@@ -3,7 +3,7 @@ import os
 import numpy as np
 
 import torch
-import torch.nn.functional as functional
+import torch.nn.functional as F
 
 from MLP import MultiLayerPerceptron
 
@@ -43,45 +43,50 @@ class DiscreteActor(MultiLayerPerceptron):
     def action_distr_sample(self, obs, reparameterize = True, deterministic = False):
         action_logits = self.forward(obs)
 
+        probs = F.softmax(action_logits)
 
-        # action = prob_distr.sample()
+        prob_distr = torch.distributions.Categorical(probs)
 
-        # action_probs = prob_distr.probs
+        actions = prob_distr.sample().view(-1, 1)
 
-        log_prob = functional.log_softmax(action_logits, dim = 1).squeeze()
+        # Avoid numerical instability.
+        z = (probs == 0.0).float() * 1e-8
+        log_probs = torch.log(probs + z)
 
-        # the normal prob distribution
-        # action_softmax = functional.softmax(action_logits, dim = 1)
-        # categorical distribution
-        # prob_distr = torch.distributions.OneHotCategorical(action_softmax)
+        return actions, log_probs, probs
 
-        if reparameterize:
+        # prob_distr = torch.distributions.OneHotCategorical(logits = action_logits)
+
+        # log_prob = F.log_softmax(action_logits, dim = 1).squeeze()
+
+        # if reparameterize:
         #     # to use the reparameterization trick instead
         #     # of the stochastic sampling process that stops
         #     # gradients, we can use the gumbel softmax
         #     # which introduces noise as a linear combination
         #     # to sample from the distribution.
-            action = functional.gumbel_softmax(action_logits, hard = True, tau = self.gumbel_temperature, dim = 1)
-            # one_hot_action = functional.gumbel_softmax(action_logits, hard = True, tau = self.gumbel_temperature, dim = 1)
+        #     action = functional.gumbel_softmax(action_logits, hard = True, tau = self.gumbel_temperature, dim = 1)
             
         #     # convert one_hot_action into integer
-            # action = torch.matmul(one_hot_action, self.action_categories)
-        else:            
-            prob_distr = torch.distributions.OneHotCategorical(logits = action_logits)
-            if deterministic:
-                action = torch.argmax(prob_distr.probs)
-            else:
-                action = prob_distr.sample()
+        #     # action = torch.matmul(one_hot_action, self.action_categories)
+        # else:            
+        #     prob_distr = torch.distributions.OneHotCategorical(logits = action_logits)
+        #     if deterministic:
+        #         action = torch.argmax(prob_distr.probs)
+        #     else:
+        #         action = prob_distr.sample()
 
-        # log of the prob_distr function evaluated at sample value
-        # log_prob = prob_distr.log_prob(action)
-        # log_prob = log_prob.sum(axis = -1)
+        # action_clone = action.clone().detach()
+        # # get log prob associated with current action
+        # log_prob_action = torch.masked_select(log_prob, action_clone.bool())
+        # # log_prob_action = prob_distr.log_prob(action)
+        # # print("LOGp", log_prob_action.shape)
 
-        # final action
-        action = action.to(self.device) # should be on device
+        # # final action
+        # action = action.to(self.device) # should be on device
 
-        # return action, log_prob, action_probs
-        return action, log_prob
+        # # return action, log_prob, action_probs
+        # return action, log_prob_action, prob_distr.probs
     
 # a = DiscreteActor(0.0003, 4, 5)
 

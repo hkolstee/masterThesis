@@ -100,6 +100,9 @@ class Agents:
         # Two centralized critics (two for stable learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
         print("act", self.obs_size_global + sum([act_space.n for act_space in self.env.action_space[:-1]]) + self.agent_ids.shape[0])
         print("crit", self.obs_size_global + sum([act_space.n for act_space in self.env.action_space]) + self.agent_ids.shape[0])
+        self.actor_input_size = self.obs_size_global + sum([act_space.n for act_space in self.env.action_space[:-1]]) + self.agent_ids.shape[0]
+        self.critic_input_size = self.obs_size_global + sum([act_space.n for act_space in self.env.action_space]) + self.agent_ids.shape[0]
+
         self.actor = DiscreteActor(lr = lr_actor,
                                    obs_size = self.obs_size_global + sum([act_space.n for act_space in self.env.action_space[:-1]]) + self.agent_ids.shape[0],
                                    action_size = self.env.action_space[0].n,
@@ -142,54 +145,56 @@ class Agents:
             # the entropy coef alpha which is to be optimized
             self.log_alphas.append(torch.ones(1, requires_grad = True, device = self.device))   # device this way otherwise leaf tensor
             self.alpha_optimizers.append(torch.optim.Adam([self.log_alphas[-1]], lr = lr_critic))   # shares critic lr
+
     
-    def create_full_input(self, obs_set, action_set):
-        """
-        Creates the complete unmasked input for the final critic in sequence.
-        Thus, creates: input = tensor([obs, action_1, ... , action_m, ones(nr_agents)]
-
-        After, needs to be masked, using the mask_input() function, which maskes all 
-        actions which the network should not have access to at that step, and masks 
-        the ones columns to create a one hot id-vector for agent identification.
-        """
-        # print(observations.shape, actions.shape, self.nr_agents)
-        print(obs_set.shape, action_set.shape, torch.ones((obs_set.shape[0], self.nr_agents)).shape)
-
-        out = torch.column_stack((obs_set, action_set, torch.ones((obs_set.shape[0], self.nr_agents))))
-        print(out.shape)
-        # sys.exit()
-        return out
     
-    def mask_input(self, input, agent_idx, setting):
-        """
-        Masks the full input to the correct agent input.
+    # def create_full_input(self, obs_set, action_set):
+    #     """
+    #     Creates the complete unmasked input for the final critic in sequence.
+    #     Thus, creates: input = tensor([obs, action_1, ... , action_m, ones(nr_agents)]
 
-        Input:
-            setting (string: "actor" or "critic") = the type of masking pattern desired,
-                                                    either critic [a1...ai] actions, or actor 
-                                                    with [a1, ..., ai-1] actions. 
-        """
-        if setting != "actor" and setting != "critic":
-            raise Exception("Only supported masking settings are: [\"actor\", \"critic\"].")
+    #     After, needs to be masked, using the mask_input() function, which maskes all 
+    #     actions which the network should not have access to at that step, and masks 
+    #     the ones columns to create a one hot id-vector for agent identification.
+    #     """
+    #     # print(observations.shape, actions.shape, self.nr_agents)
+    #     print(obs_set.shape, action_set.shape, torch.ones((obs_set.shape[0], self.nr_agents)).shape)
 
-        # in our algorithm, all actor and critics get the complete combined state of all agents
-        # additionally, all agents have the same action space size
-        obs_mask = torch.zeros(self.obs_size_global, dtype = torch.int32).bool()
-        one_hot_id_mask = torch.logical_not(self.agent_ids[agent_idx])
-        if setting == "actor":
-            # actor
-            actions_mask = torch.cat([torch.zeros(size) if idx < agent_idx else torch.ones(size) for idx, size in enumerate(self.action_sizes[:-1])]).bool()
-        else:
-            # critic
-            actions_mask = torch.cat([torch.zeros(size) if idx <= agent_idx else torch.ones(size) for idx, size in enumerate(self.action_sizes)]).bool()
+    #     out = torch.column_stack((obs_set, action_set, torch.ones((obs_set.shape[0], self.nr_agents))))
+    #     print(out.shape)
+    #     # sys.exit()
+    #     return out
+    
+    # def mask_input(self, input, agent_idx, setting):
+    #     """
+    #     Masks the full input to the correct agent input.
+
+    #     Input:
+    #         setting (string: "actor" or "critic") = the type of masking pattern desired,
+    #                                                 either critic [a1...ai] actions, or actor 
+    #                                                 with [a1, ..., ai-1] actions. 
+    #     """
+    #     if setting != "actor" and setting != "critic":
+    #         raise Exception("Only supported masking settings are: [\"actor\", \"critic\"].")
+
+    #     # in our algorithm, all actor and critics get the complete combined state of all agents
+    #     # additionally, all agents have the same action space size
+    #     obs_mask = torch.zeros(self.obs_size_global, dtype = torch.int32).bool()
+    #     one_hot_id_mask = torch.logical_not(self.agent_ids[agent_idx])
+    #     if setting == "actor":
+    #         # actor
+    #         actions_mask = torch.cat([torch.zeros(size) if idx < agent_idx else torch.ones(size) for idx, size in enumerate(self.action_sizes[:-1])]).bool()
+    #     else:
+    #         # critic
+    #         actions_mask = torch.cat([torch.zeros(size) if idx <= agent_idx else torch.ones(size) for idx, size in enumerate(self.action_sizes)]).bool()
             
-        # create masking tensor
-        masking_tensor = torch.cat((obs_mask, actions_mask, one_hot_id_mask))
+    #     # create masking tensor
+    #     masking_tensor = torch.cat((obs_mask, actions_mask, one_hot_id_mask))
 
-        # apply masking tensor
-        masked_input = torch.masked_fill(input, masking_tensor, value = 0.)
+    #     # apply masking tensor
+    #     masked_input = torch.masked_fill(input, masking_tensor, value = 0.)
 
-        return masked_input
+    #     return masked_input
         
 
     # def create_padded_action_input(self, actions, agent_idx):
@@ -268,10 +273,7 @@ class Agents:
             # seq_a_ip1    = tensor[(A_1, ... , A_i+1)]
             seq_a_im1 = torch.empty((replay_act[0].shape[0], 0), dtype = torch.float32)
 
-            # create complete input tensor[(S, A_1, ... , A_m, ones(nr_agents))]
-            # unmasked_action_input = self.create_full_input(obs_set, )
-            # unmasked_critic_input = self.create_full_input(obs_set, replay_act_set)
-            unmasked_critic_replay_input = self.create_full_input(obs_set, replay_act_set)
+
 
             # SEQUENTIALLY update shared critics/actor for each agent
             for agent_idx in range(self.nr_agents):
@@ -422,7 +424,8 @@ class Agents:
             for agent_idx in range(self.nr_agents):
                 
                 # seq_input is observations plus preceding actor actions
-                seq_input = torch.cat([global_obs, self.create_padded_action_input(seq_acts, agent_idx)], dim = 1)
+                # seq_input = torch.cat([global_obs, self.create_padded_action_input(seq_acts, agent_idx)], dim = 1)
+
                 # sample action from policy
                 actions, _, _ = self.actor.action_distr_sample(seq_input, reparameterize, deterministic)
                     

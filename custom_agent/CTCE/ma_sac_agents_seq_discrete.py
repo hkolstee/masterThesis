@@ -6,7 +6,7 @@ import pandas as pd
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
+import torch.nn.functional as F
 import torch.optim as optim
 
 # temporary needed
@@ -33,21 +33,21 @@ from copy import deepcopy
 from tqdm import tqdm
 
 class Agents:
-    """
-    Multi-agent Soft Actor-Critic centralized training decentralized execution agents.
-    The critics are centralized, while the actors are decentralized.
+    """Sequential multi-agent soft actor-critic.
 
     Args:
-        env (gym.environment): The environment the agent acts within
-        lr_actor (float): Actor network learning rate
-        lr_critic (float): Critic network learning rate
-        gamma (float): Next reward estimation discount
-        polyak (float): Factor of polyak averaging
-        buffer_max_size (int): The maximal size of the replay buffer
-        batch_size (int): Sample size when sampling from the replay buffer
-        layer_sizes (tuple:int): The sizes of the hidden multi-layer-perceptron
-            layers within the function estimators (value, actor, critic)
-        reward_scaling (int): Scaling of the reward with regard to the entropy
+        env (_type_): _description_
+        lr_actor (float, optional): _description_. Defaults to 0.0003.
+        lr_critic (float, optional): _description_. Defaults to 0.0003.
+        gamma (float, optional): _description_. Defaults to 0.99.
+        polyak (float, optional): _description_. Defaults to 0.995.
+        buffer_max_size (int, optional): _description_. Defaults to 1000000.
+        batch_size (int, optional): _description_. Defaults to 256.
+        layer_sizes (tuple, optional): _description_. Defaults to (256, 256).
+        log_dir (str, optional): _description_. Defaults to "tensorboard_logs".
+        global_observations (bool, optional): Whether the environment is modelled to return 
+            the global observation for each agent, or a local observation per agent. Defaults
+            to False.
     """
     def __init__(self, 
                  env, 
@@ -58,11 +58,13 @@ class Agents:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
-                 log_dir = "tensorboard_logs"):
+                 log_dir = "tensorboard_logs",
+                 global_observations = False):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
         self.batch_size = batch_size
+        self.global_observations = global_observations
         self.nr_agents = len(env.action_space)
         
         # initialize device
@@ -85,40 +87,49 @@ class Agents:
         self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_size_list, act_size_list, batch_size)
         
         # one-hot identity per agent
-        self.agent_ids = functional.one_hot(torch.tensor(range(self.nr_agents))).int()
-        # self.agent_ids = functional.one_hot(torch.tensor(range(self.nr_agents))).float()
+        self.agent_ids = F.one_hot(torch.tensor(range(self.nr_agents))).int()
+        # create premade batch sized tensors with the ids to add to inputs
+        self.agent_id_tensors = [self.agent_ids[agent_idx].unsqueeze(0).expand(batch_size, -1) for agent_idx in range(self.nr_agents)]
 
-        # global obs and action for centralized critics
+        # global obs size, action sizes
         obs_sizes = [obs.shape[0] for obs in self.env.observation_space]
         self.action_sizes = [act.n for act in self.env.action_space]
-        self.obs_size_global = sum(obs_sizes)
-        self.act_input_size_critic = sum(self.action_sizes)
-        self.act_input_size_actor = sum(self.action_sizes[:-1])
+
+        # if not all agents receive global observations from env
+        if not self.global_observations:
+            obs_size_global = sum(obs_sizes)
+        # if they do
+        else:
+            obs_size_global = obs_sizes[0]
 
         # policies according to method as described in: https://arxiv.org/pdf/1910.00120.pdf
         #   Simply: sequentially calculate policies, while conditioning next policy calculation on action result of last.
         #           Done sequentially per agent, where we do not care about order. One actor in total for all agents, with parameter sharing.
         #           Requires homogenous agent action spaces.
-        # Two centralized critics (two for stable learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
+        # Two centralized critics (Double Q learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
         self.actor = DiscreteActor(lr = lr_actor,
-                                   obs_size = self.obs_size_global + self.act_input_size_actor + self.agent_ids.shape[0],
+                                   obs_size = obs_size_global + sum(self.action_sizes[:-1]) + self.agent_ids.shape[0],
                                    act_size = self.env.action_space[0].n,
                                    layer_sizes = layer_sizes)
         self.critic1 = Critic(lr = lr_critic,
-                              obs_size = self.obs_size_global + self.act_input_size_critic + self.agent_ids.shape[0],
+                              obs_size = obs_size_global + sum(self.action_sizes) + self.agent_ids.shape[0],
                               act_size = self.env.action_space[0].n,
                               layer_sizes = layer_sizes)
         self.critic2 = Critic(lr = lr_critic,
-                              obs_size = self.obs_size_global + self.act_input_size_critic + self.agent_ids.shape[0],
+                              obs_size = obs_size_global + sum(self.action_sizes) + self.agent_ids.shape[0],
                               act_size = self.env.action_space[0].n,
                               layer_sizes = layer_sizes)
+        
+        # actor outputs onehot vectors for the actions, we can multiply it with this vector using torch.matmul to get the indices, while keeping grad
+        self.action_categories = torch.tensor([i for i in range(self.actor.output_size)], dtype = torch.float32)
 
         # optimizers
         self.actor_optimizers = []
         self.critic1_optimizers = []
         self.critic2_optimizers = []
         for agent_idx in range(self.nr_agents):
-            # learning rate should anneal when going through more depth
+            # learning rate should anneal when going through more depth in sequence, lowest at actor/ciritc 1
+            #   because the last agent in sequence gets the actual reward signal (for now) so it should learn faster
             self.actor_optimizers.append(optim.Adam(self.actor.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_actor))
             self.critic1_optimizers.append(optim.Adam(self.critic1.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_critic))
             self.critic2_optimizers.append(optim.Adam(self.critic2.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_critic))
@@ -139,41 +150,11 @@ class Agents:
         self.alpha_optimizers = []
         for act_space in self.env.action_space:
             # from cleanRL
-            # self.entropy_targs.append(-0.89 * torch.log(1 / torch.tensor(act_space.n)))
-            self.entropy_targs.append(-torch.prod(torch.Tensor(act_space.shape).to(self.device)).item())
+            self.entropy_targs.append(-act_space.n)
+            # self.entropy_targs.append(-torch.prod(torch.Tensor(act_space.shape).to(self.device)).item())
             # the entropy coef alpha which is to be optimized
             self.log_alphas.append(torch.ones(1, requires_grad = True, device = self.device))   # device this way otherwise leaf tensor
             self.alpha_optimizers.append(torch.optim.Adam([self.log_alphas[-1]], lr = lr_critic))   # shares critic lr
-        
-
-    def create_padded_action_input(self, action_set, agent_idx, setting):
-        """
-        Creates appropriate input actions for parameter sharing networks.
-        Adds an one-hot ID vector and pads the remaining empty input with 0s.
-
-        returns:
-            [A_1, ..., A_i-1, A_i, ..., A_m, one_hot_id],
-            where [A_i, ..., A_m] = 0
-        """
-        if setting != "actor" and setting != "critic":
-            raise Exception("Only supported masking settings are: [\"actor\", \"critic\"].")
-
-        one_hot_id = self.agent_ids[agent_idx]
-
-        if setting == "actor":
-            # actor
-            padding_len = self.act_input_size_actor - action_set.shape[1]
-        else:
-            # critic
-            padding_len = self.act_input_size_critic - action_set.shape[1]
-        # pad input
-        padded_input = functional.pad(action_set, (0, padding_len), value = 0)
-        # reshape id vector into tensor we can cat
-        one_hot_id = one_hot_id.unsqueeze(0).expand(padded_input.shape[0], -1)
-        # add id vector
-        padded_input = torch.cat([padded_input, one_hot_id], dim = 1)
-
-        return padded_input
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -213,141 +194,179 @@ class Agents:
         # prepare tensors
         obs = [torch.tensor(obs, dtype=torch.float32).to(self.device) for obs in obs_list]
         next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
-        replay_act = [torch.tensor(actions, dtype=torch.float32).to(self.device) for actions in replay_act_list]
-        rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
+        replay_act = [torch.tensor(actions, dtype=torch.int64).to(self.device) for actions in replay_act_list]
+        # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
+        # NOTE: need to find a nice way to incorporate individual reward components into the intermediate losses
+        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
+
+        # if we are not given the global observation, for each agent, and we need to construct it
+        with torch.no_grad():
+            if not self.global_observations:
+                obs = torch.cat(obs, dim = 1)
+                next_obs = torch.cat(next_obs, dim = 1)
+            else:
+                # all agents are given global observations
+                obs = obs[0]
+                next_obs = next_obs[0]
         
+        # keep track of index of point where to add sequential actions to input tensor
+        seq_action_index = obs.shape[1]
+
+        # preconstruct input tensors to which the sequential actions will be added, and onehot ids will be changed
+        with torch.no_grad():
+            # prepare input
+            input_tensor_actor = torch.zeros((self.batch_size, self.actor.input_size))
+            input_tensor_critic = torch.zeros((self.batch_size, self.critic1.input_size))
+            # observations first
+            input_tensor_actor[:, 0 : obs.shape[1]] = obs
+            input_tensor_critic[:, 0 : obs.shape[1]] = obs
+            # one_hot id (of current agent) at the end of tensor
+            input_tensor_actor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
+            input_tensor_critic[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
+
         with torch.autograd.set_detect_anomaly(True):
-            # combi set of states and actions from all agents for the critics (shape = (batch, total_obs)
-            obs_set = torch.cat(obs, dim = 1)
-            next_obs_set = torch.cat(next_obs, dim = 1)
-            replay_act_set = torch.cat(replay_act, dim = 1)
-            mean_rewards = torch.mean(torch.column_stack(rewards), dim = 1)
-
-            # We need, for agent i:
-            # seq_a_im1    = tensor[(A_1, ... , A_i-1)]
-            # seq_a_i      = tensor[(A_1, ... , A_i)]
-            # seq_a_ip1    = tensor[(A_1, ... , A_i+1)]
-            seq_a_im1 = torch.empty((replay_act[0].shape[0], 0), dtype = torch.float32)
-
             # SEQUENTIALLY update shared critics/actor for each agent
             for agent_idx in range(self.nr_agents):
-                # get current obs policy action
-                # input is [S, A_1, ..., A_i-1] 
-                seq_pi_input = torch.cat([obs_set, self.create_padded_action_input(seq_a_im1, agent_idx, "actor")], dim = 1)
-                # get current obs action and logp
-                a_i, logp_i, probs_i = self.actor.action_distr_sample(seq_pi_input)
+                if agent_idx > 0:
+                    # last target Q input is same as next normal Q input (even onehot id) (NOTE: .detach() taken off, hopefully that wont mess things up)
+                    input_tensor_actor = targ_input_tensor_actor.clone()
+                    input_tensor_critic = targ_input_tensor_critic.clone()
 
-                with torch.no_grad():
-                    # for all in sequence except for the last we need the next in sequence action
-                    if agent_idx < (self.nr_agents - 1):
-                        # action of next actor
-                        seq_a_i = torch.column_stack((seq_a_im1.detach(), a_i))
-                        # add S to seqential A, input = [S, padded_seqA, one_hot_id]
-                        seq_pi_input = torch.cat([obs_set, self.create_padded_action_input(seq_a_i, agent_idx, "actor")], dim = 1)
-                        a_ip1, logp_ip1, probs_ip1 = self.actor.action_distr_sample(seq_pi_input)
-                        
-                        # create sequential action tensor
-                        seq_a_ip1 = torch.column_stack((seq_a_i.detach(), a_ip1))
+                # turn on gradients for tensors created in no_grad() zone
+                input_tensor_actor.requires_grad_(True)
+                input_tensor_critic.requires_grad_(True)
 
-                    # for the last in sequence we need the action the first actor predicts on the next state
-                    else:
-                        # action of first actor on new state
-                        seq_pi_input = torch.cat([next_obs_set, self.create_padded_action_input(torch.empty((replay_act[0].shape[0], 0)), 0, setting = "actor")], dim = 1)
-                        # get action
-                        a_1next, logp_1next, probs_1next = self.actor.action_distr_sample(seq_pi_input)
-
-
-                # ALPHA GRADIENT
-                alpha_loss = (probs_i.detach() * -self.log_alphas[agent_idx].exp() * ((logp_i.detach() + self.entropy_targs[agent_idx]))).mean()
-                # backprop + grad descent step
-                self.alpha_optimizers[agent_idx].zero_grad()        
-                alpha_loss.backward()
-                self.alpha_optimizers[agent_idx].step()
-                # get current/next alpha
-                alpha_i = torch.exp(self.log_alphas[agent_idx]).detach()
-                if agent_idx < (self.nr_agents - 1):
-                    alpha_ip1 = torch.exp(self.log_alphas[agent_idx + 1]).detach()
-                else:
-                    alpha_0 = torch.exp(self.log_alphas[0]).detach()
-
-                # CRITIC GRADIENT
-                # add action to sequential actions for seq_input to Q-func
-                seq_Q_input = self.create_padded_action_input(seq_a_i, agent_idx, setting = "critic")
-                # seq_Q_input = self.create_padded_action_input(seq_a_im1, agent_idx, setting = "critic")
-                q1 = self.critic1.forward(torch.column_stack((obs_set, seq_Q_input)))
-                q2 = self.critic2.forward(torch.column_stack((obs_set, seq_Q_input)))
-
-                # For the bellman target, we do not need grad
-                with torch.no_grad():
-                    # target q values are from the next agent in sequence, so we use input actions [A_1, ..., A_i+1]
-                    #   with one hot id of the next critic in sequence
-                    if agent_idx < (self.nr_agents - 1):
-                        seq_Q_targ_input = self.create_padded_action_input(seq_a_ip1, agent_idx + 1, setting = "critic")
-                        q1_targ = self.critic1_targ.forward(torch.column_stack((obs_set, seq_Q_targ_input)))
-                        q2_targ = self.critic2_targ.forward(torch.column_stack((obs_set, seq_Q_targ_input)))
-
-                        # Clipped double Q-learning trick
-                        # We can use the action probs to estimate the expectation for discrete action spaces (from cleanRL)
-                        q_targ =  (probs_ip1 * (torch.minimum(q1_targ, q2_targ) - alpha_ip1.unsqueeze(1) * logp_ip1)).sum(dim = 1)
-                        # adapted bellman target for discrete actions
-                        bellman = q_targ
-                        # bellman = rewards[agent_idx + 1] + self.gamma * (1 - dones[agent_idx + 1]) * q_targ
-                        
-                    # The target for the final critic in the sequence is the normal temporal difference (next state + next state action)
-                    # But, we take the first critic in the sequence to calculate this target.
-                    else:
-                        seq_Q_targ_input = self.create_padded_action_input(torch.empty((replay_act[0].shape[0], 0)), 0, setting = "critic")
-                        # So: Q target for the last critic in sequence is on the next state policy action Q-value, predicted by the first actor and critic.
-                        q1_targ = self.critic1_targ.forward(torch.column_stack((next_obs_set, seq_Q_targ_input)))
-                        q2_targ = self.critic2_targ.forward(torch.column_stack((next_obs_set, seq_Q_targ_input)))
-
-                        # Clipped double Q-learning trick
-                        # We can use the action probs to estimate the expectation for discrete action spaces (from cleanRL)
-                        q_targ =  (probs_1next * (torch.minimum(q1_targ, q2_targ) - alpha_0.unsqueeze(1) * logp_1next)).sum(dim = 1)
-                        # adapted bellman target for discrete actions
-                        # print(len(rewards), rewards[0].shape)
-                        bellman = mean_rewards + self.gamma * (1 - dones[0]) * q_targ
-                        # bellman = rewards[0] + self.gamma * (1 - dones[0]) * q_targ
+                # get alpha for remainder of this agent loop
+                alpha_i = torch.exp(self.log_alphas[agent_idx].detach())
                 
-                # we need to only use Q vals of actions we chose/sampled
-                q1 = q1.gather(1, replay_act[agent_idx].long()).view(-1)
-                q2 = q2.gather(1, replay_act[agent_idx].long()).view(-1)
+                # --- CRITIC GRADIENT ---
+                # Q values to measure against target
+                q1 = self.critic1.forward(input_tensor_critic)
+                q2 = self.critic2.forward(input_tensor_critic)
 
-                # calculate loss
-                loss_Q1 = functional.mse_loss(q1, bellman)
-                loss_Q2 = functional.mse_loss(q2, bellman)
-                loss_Q = loss_Q1 + loss_Q2
+                with torch.no_grad():
+                    if agent_idx < (self.nr_agents - 1):
+                        """
+                        FOR ALL AGENTS IN SEQUENCE i = (1, ..., m - 1):
+                            We compare against only the Q-value of the next in sequence.
+                        """
+                        # alpha of next in sequence
+                        alpha_ip1 = torch.exp(self.log_alphas[agent_idx + 1].detach())
+
+                        # first we have to add the actions to the input tensor, and change the onehot id
+                        targ_input_tensor_actor = input_tensor_actor.clone()
+                        targ_input_tensor_critic = input_tensor_critic.clone()
+
+                        # add additional actions
+                        current_action = F.one_hot(replay_act[agent_idx], num_classes = self.actor.output_size).squeeze(1)
+                        targ_input_tensor_actor[:, seq_action_index : seq_action_index + current_action.shape[1]] = current_action
+                        targ_input_tensor_critic[:, seq_action_index : seq_action_index + current_action.shape[1]] = current_action
+                        # move index (NOTE MAYBE)
+                        seq_action_index += current_action.shape[1]
+
+                        # we also need to change the onehot id in the tensor
+                        targ_input_tensor_actor[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
+                        targ_input_tensor_critic[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
+
+                        # get actor output of next stage in sequence
+                        act_ip1, logp_ip1, probs_ip1 = self.actor.action_distr_sample(targ_input_tensor_actor)
+
+                        # get critics output of next stage in sequence
+                        q1_targ = self.critic1_targ.forward(targ_input_tensor_critic)
+                        q2_targ = self.critic2_targ.forward(targ_input_tensor_critic)
+
+                        # Clipped double Q trick
+                        min_q_targ = torch.minimum(q1_targ, q2_targ)
+                        # Action probabilities can be used to estimate the expectation (cleanRL)
+                        # we do not compare to the temporal difference target for all agents in sequence except the last.
+                        # we just compare to the next in sequence Q val as target (no reward/discount)
+                        target =  (probs_ip1 * (min_q_targ - alpha_ip1.unsqueeze(1) * logp_ip1)).sum(dim = 1)
+                    else:
+                        """
+                        FOR AGENT i = m:
+                            We compare against only the temporal difference target of the first in sequence.
+                        """
+                        # alpha of first in sequence
+                        alpha_0 = torch.exp(self.log_alphas[0].detach())
+
+                        # create new target tensors
+                        targ_input_tensor_actor = torch.zeros((self.batch_size, self.actor.input_size))
+                        targ_input_tensor_critic = torch.zeros((self.batch_size, self.critic1.input_size))
+
+                        # we also need to change the onehot id in the tensor to the first in sequence
+                        targ_input_tensor_actor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
+                        targ_input_tensor_critic[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
+
+                        # add next observation
+                        targ_input_tensor_actor[:, 0 : next_obs.shape[1]] = next_obs
+                        targ_input_tensor_critic[:, 0 : next_obs.shape[1]] = next_obs
+
+                        # get actor output of first stage/agent in sequence
+                        act_0_nextobs, logp_0_nextobs, probs_0_nextobs = self.actor.action_distr_sample(targ_input_tensor_actor)
+
+                        # get critics output of first stage in sequence
+                        q1_targ = self.critic1_targ.forward(targ_input_tensor_critic)
+                        q2_targ = self.critic2_targ.forward(targ_input_tensor_critic)
+
+                        # Clipped double Q trick
+                        min_q_targ = torch.minimum(q1_targ, q2_targ)
+                        # Action probabilities can be used to estimate the expectation (cleanRL)
+                        q_targ = (probs_0_nextobs * (min_q_targ - alpha_0.unsqueeze(1) * logp_0_nextobs)).sum(dim = 1)
+
+                        # for the last we do compare with the temporal difference target, so we use reward (mean) and discount
+                        target = rewards + self.gamma * (1 - dones[agent_idx]) * q_targ
+
+                # gather Q values from actions taken in replay (gather not inplace operation)
+                q1 = q1.gather(1, replay_act[agent_idx]).squeeze()
+                q2 = q2.gather(1, replay_act[agent_idx]).squeeze()
+
+                # loss is MSEloss
+                loss_critic1 = F.mse_loss(q1, target)
+                loss_critic2 = F.mse_loss(q2, target)
+                loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
 
                 # backward prop + gradient step
-                self.critic1_optimizers[agent_idx].zero_grad()
-                self.critic2_optimizers[agent_idx].zero_grad()
-                loss_Q.backward()
-                self.critic1_optimizers[agent_idx].step()
-                self.critic2_optimizers[agent_idx].step()
+                self.critic1.optimizer.zero_grad()
+                self.critic2.optimizer.zero_grad()
+                loss_critic.backward()
+                self.critic1.optimizer.step()
+                self.critic2.optimizer.step()
 
-                # ACTOR GRADIENT
-                # Q-values already computed (same as q1, and q2 in critic gradient)
-                q_pi = torch.minimum(q1.detach(), q2.detach())
-                # loss policy
-                # no need for reparameterization, expectation can be calculated for discrete actions (cleanRL)
-                loss_pi = (probs_i * (alpha_i.unsqueeze(1) * logp_i - q_pi.unsqueeze(1))).mean()
+                # --- ACTOR GRADIENT ---
+                # first we compute the actor output for the current stage in the sequence
+                act_i, logp_i, probs_i = self.actor.action_distr_sample(input_tensor_actor)
+                # first freeze critic gradient calculation to save computation
+                for params in self.critic1.parameters():
+                    params.requires_grad = False
+                for params in self.critic2.parameters():
+                    params.requires_grad = False
+
+                # compute Q-values (NOTE: SAME AS ABOVE? TEST IF MATTERS)
+                q1_policy = self.critic1.forward(input_tensor_critic)
+                q2_policy = self.critic2.forward(input_tensor_critic)
+                # Clipped double Q-trick
+                q_policy = torch.minimum(q1_policy, q2_policy)
+                # entropy regularized loss
+                loss_policy = (probs_i * (alpha_i.unsqueeze(1) * logp_i - q_policy)).mean()
+
+                # --- AUTOMATIC ENTROPY TEMPERATURE TUNING ---
+                #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
+                # we detach because otherwise we backward through the graph of previous calculations using log_prob
+                # Action probabilities can be used to estimate the expectation (cleanRL)
+                alpha_loss = (probs_i.detach() * (-self.log_alphas[agent_idx].exp() * logp_i.detach() - self.log_alphas[agent_idx].exp() * self.entropy_targs[agent_idx])).mean()
 
                 # backward prop + gradient step
-                self.actor_optimizers[agent_idx].zero_grad()
-                loss_pi.backward()
-                self.actor_optimizers[agent_idx].step()
-
-                # set [A_1, ..., A_i-1]
-                seq_a_im1 = seq_a_i.detach()
+                self.alpha_optimizers[agent_idx].zero_grad()
+                alpha_loss.backward()
+                self.alpha_optimizers[agent_idx].step()   
 
                 # log values
-                loss_Q_list.append(loss_Q.cpu().detach().numpy())
-                loss_pi_list.append(loss_pi.cpu().detach().numpy())
+                loss_Q_list.append(loss_critic.cpu().detach().numpy())
+                loss_pi_list.append(loss_policy.cpu().detach().numpy())
                 logp_list.append(logp_i.cpu().detach().numpy().mean())
                 alpha_list.append(alpha_i.cpu().detach().numpy()[0])
                 alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
-
 
         # Polyak averaging update
         with torch.no_grad():
@@ -369,24 +388,47 @@ class Agents:
     def get_action(self, observations, reparameterize = True, deterministic = False):
         # get actor action
         action_list = []
+
         with torch.no_grad():
-            # get global observation
-            global_obs = torch.cat([torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device) for obs in observations], dim = 1)
+            # make tensor if needed
+            if not torch.is_tensor(observations[0]):
+                # if global observations are given to each agent, we do not need to create it
+                if self.global_observations:
+                    global_obs = torch.tensor(observations[0], dtype = torch.float32)
+                # we need to construct the global observation
+                else:
+                    global_obs = torch.tensor([o for observation in observations for o in observation], dtype = torch.float32)
+            else:
+                if self.global_observations:
+                    global_obs = torch.cat(observations)
+                else:
+                    global_obs = observations[0].to(torch.float32)
+            
+            # create input tensor
+            input_tensor = torch.zeros((self.actor.input_size))
+            # inplace does not matter because of no_grad()
+            # observations first
+            input_tensor[0 : global_obs.shape[0]] = global_obs
 
-            # sequential actions used as seq_input in succeeding actors
-            seq_acts = torch.empty((1, 0))
+            # index in input tensor where to add additional sequential actions
+            seq_action_index = global_obs.shape[0]
+
             for agent_idx in range(self.nr_agents):
-                
-                # seq_input is observations plus preceding actor actions
-                seq_input = torch.cat([global_obs, self.create_padded_action_input(seq_acts, agent_idx, "actor")], dim = 1)
-                # sample action from policy
-                actions, _, _ = self.actor.action_distr_sample(seq_input, reparameterize, deterministic)
-                    
-                # add to next seq_input
-                seq_acts = torch.cat([seq_acts, actions], dim = 1)
+                if agent_idx > 0:
+                    # add previous sequential action
+                    current_action = F.one_hot(torch.tensor(action_list[-1], dtype = torch.int64), num_classes = self.actor.output_size)
+                    # add to tensor on the right indices
+                    input_tensor[seq_action_index : seq_action_index + current_action.shape[0]] = current_action
+                    # move sequential index
+                    seq_action_index += current_action.shape[0]
 
-                # add to list
-                # convert from one hot to integer if needed
+                # add new one_hot id at the end of the tensor
+                input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
+
+                # sample action from policy
+                actions, _, _ = self.actor.action_distr_sample(input_tensor.unsqueeze(0), reparameterize, deterministic)
+                    
+                # add to list, convert from one hot to integer
                 action_list.append(torch.argmax(actions).item())
 
         return action_list

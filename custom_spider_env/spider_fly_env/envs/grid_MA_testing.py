@@ -223,6 +223,7 @@ class SpiderFlyEnvMA(ParallelEnv):
         #     self.reset()
         # else:
         #     rewards = {a: -0.1 for a in self.possible_agents}
+        # rewards = {a: np.mean(agent_rewards) for a in self.possible_agents}
         rewards = {a: rew for (a, rew) in zip(self.possible_agents, agent_rewards)}
 
         # get observation

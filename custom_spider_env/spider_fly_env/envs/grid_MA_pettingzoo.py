@@ -214,7 +214,7 @@ class SpiderFlyEnvMA(ParallelEnv):
 
     def step(self, actions):
         # we move the fly first
-        self.move_fly()
+        # self.move_fly()
 
         # Move each spider in a legal manner, if an illigal move is done, the
         # spider does nothing. The spiders move sequentially, so the new 
