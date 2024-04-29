@@ -287,8 +287,9 @@ class seqDQN:
             truncations = [False]
             rew_sum = [0 for _ in range(self.nr_agents)]
             loss_sum = [0 for _ in range(self.nr_agents)]
-
-            episode_steps = 0
+            
+            # keep track of number of learning steps
+            learn_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
@@ -304,6 +305,7 @@ class seqDQN:
 
                 if status:
                     # add to loss sum
+                    learn_steps += 1
                     loss_sum = np.add(loss_sum, losses)
 
                 # add to reward sum
@@ -313,13 +315,12 @@ class seqDQN:
                 obs = next_obs
 
                 # keep track of steps
-                episode_steps += 1
                 if self.global_steps < self.eps_steps:
                     self.global_steps += 1
 
             # log
             reward_log.append(rew_sum)
-            loss_log.append(np.divide(loss_sum, episode_steps))
+            loss_log.append(np.divide(loss_sum, learn_steps))
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])
