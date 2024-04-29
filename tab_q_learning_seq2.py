@@ -8,7 +8,7 @@ from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEn
 from custom_spider_env.spider_fly_env.envs.pettingzoo_wrapper import PettingZooWrapper
 
 class SequentialTabularQLearning:
-    def __init__(self, env, lr = 0.1, gamma = 0.9, eps = 0.1):
+    def __init__(self, env, lr = 0.9, gamma = 0.9, eps = 0.1):
         self.env = env
         self.lr = lr
         self.gamma = gamma

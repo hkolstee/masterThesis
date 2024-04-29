@@ -188,7 +188,7 @@ class seqDQN:
                         # Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * maxQ_next_obs
                 
                 # loss
-                loss = F.huber_loss(Q_taken_action, Q_target.unsqueeze(1))
+                loss = F.mse_loss(Q_taken_action, Q_target.unsqueeze(1))
                 # backward prop + gradient step
                 self.optimizers_dqn1[agent_idx].zero_grad()
                 self.optimizers_dqn2[agent_idx].zero_grad()
@@ -292,6 +292,7 @@ class seqDQN:
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
+                print(actions)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 

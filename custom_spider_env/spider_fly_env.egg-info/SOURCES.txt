@@ -8,5 +8,6 @@ spider_fly_env.egg-info/top_level.txt
 spider_fly_env/envs/__init__.py
 spider_fly_env/envs/grid.py
 spider_fly_env/envs/grid_MA_pettingzoo.py
-spider_fly_env/envs/grid_MA_pettingzoo_test.py
+spider_fly_env/envs/grid_MA_pettingzoo_easier.py
+spider_fly_env/envs/grid_MA_testing.py
 spider_fly_env/envs/pettingzoo_wrapper.py
