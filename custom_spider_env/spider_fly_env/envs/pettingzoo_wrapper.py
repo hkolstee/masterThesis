@@ -40,8 +40,11 @@ class PettingZooWrapper(Wrapper):
         """
         new_actions = {}
         # agent keys
-        for (agent, action) in zip(self.env.agents, actions):
+        for (agent, action) in zip(self.env.possible_agents, actions):
             new_actions[agent] = action
+
+        # check 
+        assert len(new_actions) > 0
 
         next_obs, rewards, dones, truncations, infos = self.env.step(new_actions)
 

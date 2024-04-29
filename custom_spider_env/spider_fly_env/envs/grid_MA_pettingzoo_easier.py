@@ -130,6 +130,13 @@ class SpiderFlyEnvMA(ParallelEnv):
         # set np random seed
         self.rng = np.random.default_rng(seed = seed)
 
+        # reset agent names
+        self.agents = []
+        for agent_idx in range(self.nr_spiders):
+            # agent name string
+            agent = "spider_" + str(agent_idx)
+            self.agents.append(agent)
+
         # random spider/fly locations 
         spawn_locs = set()
         self._spider_locations = []
@@ -222,15 +229,14 @@ class SpiderFlyEnvMA(ParallelEnv):
         # Move each spider in a legal manner, if an illigal move is done, the
         # spider does nothing. The spiders move sequentially, so the new 
         # position of the previous spider will be used for deciding illigality.
-        print("ACTIONS", actions)
+        assert len(actions) > 0        
         for idx, (agent, action) in enumerate(actions.items()):
-            print("ACTIONS", idx, agent, action)
             self.take_action(idx, action)
 
         # render
         if self.render_mode == "ascii":
             self._print_state_matrix()
-            print("LOCATIONS", self._fly_location, self._spider_locations)
+            # print("LOCATIONS", self._fly_location, self._spider_locations)
 
         # check if terminal state has been reached
         terminal, occupied_sides = self.check_terminal()

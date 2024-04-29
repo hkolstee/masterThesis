@@ -17,7 +17,7 @@ from custom_spider_env.spider_fly_env.envs.pettingzoo_wrapper import PettingZooW
 
 from copy import deepcopy
 
-class seqDQN:
+class seqDoubleDQN:
     def __init__(self, env, 
                  lr = 1e-3, 
                  gamma = 0.99, 
@@ -43,6 +43,9 @@ class seqDQN:
 
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
+        # logging
+        self.logger = Logger(env, log_dir)
 
         # starting epsilon
         self.eps = eps_start
@@ -184,11 +187,11 @@ class seqDQN:
                         Q_next_obs = torch.minimum(Q1_next_obs, Q2_next_obs).max(1).values
 
                         # normal temporal difference target
-                        Q_target = rewards + self.gamma * Q_next_obs
-                        # Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * maxQ_next_obs
+                        # Q_target = rewards + self.gamma * Q_next_obs
+                        Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * Q_next_obs
                 
                 # loss
-                loss = F.mse_loss(Q_taken_action, Q_target.unsqueeze(1))
+                loss = F.huber_loss(Q_taken_action, Q_target.unsqueeze(1))
                 # backward prop + gradient step
                 self.optimizers_dqn1[agent_idx].zero_grad()
                 self.optimizers_dqn2[agent_idx].zero_grad()
@@ -293,7 +296,7 @@ class seqDQN:
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
-                print("CHOSEN ACTIONS", actions)
+                # print("CHOSEN ACTIONS", actions)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
@@ -324,5 +327,6 @@ class seqDQN:
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])
+                print("eps: ", self.eps_end + (self.eps_start - self.eps_end) * ((self.eps_steps - self.global_steps) / self.eps_steps))
 
         return reward_log, loss_log
