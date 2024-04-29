@@ -292,7 +292,7 @@ class seqDQN:
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
-                print(actions)
+                print("CHOSEN ACTIONS", actions)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
