@@ -207,6 +207,7 @@ class SpiderFlyEnvMA(ParallelEnv):
         sides = [tuple(side) for side in [self._action_to_direction[action] + self._fly_location for action in [1, 2, 3, 4]]]
         # check in grid array if flies are on these possible possitions
         count = 0
+        spider_rew = np.repeat(-1, self.nr_spiders)
         for side in sides:
             # collides with wall
             if any((coord < 0 or coord >= self.size) for coord in side):
@@ -214,10 +215,14 @@ class SpiderFlyEnvMA(ParallelEnv):
             # spider
             elif (self._state[side] == SPIDER):
                 count += 1
+                for (idx, loc) in enumerate(self._spider_locations):
+                    if tuple(loc) == side:
+                        spider_rew[idx] = 1
+        # if all sides are occupied
         if count == 4:
-            return True, count
+            return True, count, spider_rew
         else:
-            return False, count
+            return False, count, spider_rew
 
     def step(self, actions):
         # we move the fly first
@@ -235,14 +240,13 @@ class SpiderFlyEnvMA(ParallelEnv):
             self._print_state_matrix()
 
         # check if terminal state has been reached
-        terminal, occupied_sides = self.check_terminal()
+        terminal, occupied_sides, spiders_rew = self.check_terminal()
 
         # get reward, each step 
         if terminal:
             rewards = {a: 1 for a in self.possible_agents}
-            self.reset()
         else:
-            rewards = {a: 0.001 * (occupied_sides - 4) for a in self.possible_agents}
+            rewards = {a: 0.001 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
 
         # get observation
         observations = self._get_obs()

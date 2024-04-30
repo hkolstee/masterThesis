@@ -516,7 +516,7 @@ class Agents:
                 # add info to progress bar
                 if (ep % 50 == 0):
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
-                # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
+                    # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
                 # reset
                 obs, _ = self.env.reset()

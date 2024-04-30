@@ -133,10 +133,10 @@ class IndependentDQN:
             obs, _ = self.env.reset()
             terminals = [False]
             truncations = [False]
-            rew_sum = [0 for _ in range(self.nr_agents)]
-            loss_sum = [0 for _ in range(self.nr_agents)]
+            rew_sum = np.zeros(self.nr_agents)
+            loss_sum = np.zeros(self.nr_agents)
 
-            episode_steps = 0
+            learn_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = []
@@ -151,10 +151,9 @@ class IndependentDQN:
                 # learning step
                 status, losses = self.learn()
 
-                # if step % 1000 == 0:
-                #     self.shared_target_DQN.load_state_dict(self.shared_DQN.state_dict())
-
                 if status:
+                    # add to learn steps
+                    learn_steps += 1
                     # add to loss sum
                     loss_sum = np.add(loss_sum, losses)
                     # soft update / polyak update
@@ -173,13 +172,12 @@ class IndependentDQN:
                 obs = next_obs
 
                 # keep track of steps
-                episode_steps += 1
                 if self.global_steps < self.eps_steps:
                     self.global_steps += 1
 
             # log
             reward_log.append(rew_sum)
-            loss_log.append(np.divide(loss_sum, episode_steps))
+            loss_log.append(loss_sum / learn_steps)
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])

@@ -44,6 +44,9 @@ class seqDQN:
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+        # logging utility
+        self.logger = Logger(env, log_dir)
+
         # starting epsilon
         self.eps = eps_start
         # count global steps for epsilon 
@@ -77,7 +80,7 @@ class seqDQN:
         # we need different optimizers for the different agents (mostly because of lower learning rate)
         self.optimizers = []
         for agent_idx in range(self.nr_agents):
-            self.optimizers.append(optim.Adam(self.shared_DQN.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr, eps = 1e-08))
+            self.optimizers.append(optim.Adam(self.shared_DQN.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr))
 
         # Replay buffer
         obs_size_list = [obs.shape for obs in env.observation_space]
@@ -92,6 +95,8 @@ class seqDQN:
         
         # logging list for return of the function
         loss_Q_list = []
+        Q_list = []
+        Q_target_list = []
 
         # sample from buffer 
         #   list of batches (one for each agent, same indices out of buffer and therefore same multi-agent transition)
@@ -174,8 +179,8 @@ class seqDQN:
                         Q_next_obs = self.shared_target_DQN(targ_input_tensor).max(1).values
 
                         # normal temporal difference target
-                        Q_target = rewards + self.gamma * Q_next_obs
-                        # Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * maxQ_next_obs
+                        # Q_target = rewards + self.gamma * Q_next_obs
+                        Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * Q_next_obs
                 
                 # loss
                 loss = F.huber_loss(Q_taken_action, Q_target.unsqueeze(1))
@@ -185,7 +190,14 @@ class seqDQN:
                 self.optimizers[agent_idx].step()
 
                 # log losses
-                loss_Q_list.append(loss.detach().numpy())
+                loss_Q_list.append(loss.detach().item())
+                Q_list.append(torch.mean(Q_taken_action).detach().item())
+                Q_target_list.append(torch.mean(Q_target).detach().item())
+
+            # log Q values
+            Q_logs = {"Q": Q_list,
+                      "Q_target": Q_target_list}
+            self.logger.log(Q_logs, self.global_steps, "values")
 
         # return status 1
         return 1, loss_Q_list
@@ -196,7 +208,8 @@ class seqDQN:
         actions = []
 
         # get epsilon
-        current_eps = self.eps_end + (self.eps_start - self.eps_end) * ((self.eps_steps - self.global_steps) / self.eps_steps)
+        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps), 0) / self.eps_steps)
+        self.logger.log({"epsilon": current_eps}, self.global_steps, "train")
 
         with torch.no_grad():
             # make tensor if needed
@@ -226,24 +239,25 @@ class seqDQN:
         for agent_idx in range(self.nr_agents):
             # epsilon non-greedy
             if np.random.uniform(0, 1) < current_eps and not deterministic:
-                # add to actions, concat to sequential actions
+                # add to actions
                 actions.append(self.env.action_space[agent_idx].sample())
             # epsilon greedy
             else:
                 with torch.no_grad():
-                    if agent_idx > 0:
-                        # add previous sequential action
-                        current_action = F.one_hot(torch.tensor(actions[-1], dtype = torch.int64), num_classes = self.shared_DQN.output_size)
-                        # add to tensor on the right indices
-                        input_tensor[seq_action_index : seq_action_index + current_action.shape[0]] = current_action
-                        # move sequential index
-                        seq_action_index += current_action.shape[0]
-
                     # add new one_hot id at the end of the tensor
                     input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
 
                     # forward through DQN, take argmax for max action
                     actions.append(self.shared_DQN(input_tensor.unsqueeze(0)).argmax().item())
+
+            # for all agents except the last we add the action to the input of the next
+            if agent_idx < (self.nr_agents - 1):
+                # add selected action to tensor but first convert to onehot
+                current_action = F.one_hot(torch.tensor(actions[-1], dtype = torch.int64), num_classes = self.shared_DQN.output_size)
+                # add to tensor on the correct indices
+                input_tensor[seq_action_index : seq_action_index + current_action.shape[0]] = current_action
+                # move sequential index for the next action
+                seq_action_index += current_action.shape[0]
             
         return actions
 
@@ -256,10 +270,11 @@ class seqDQN:
             obs, _ = self.env.reset()
             terminals = [False]
             truncations = [False]
-            rew_sum = [0 for _ in range(self.nr_agents)]
-            loss_sum = [0 for _ in range(self.nr_agents)]
+            rew_sum = np.zeros(self.nr_agents)
+            loss_sum = np.zeros(self.nr_agents)
 
-            episode_steps = 0
+            learn_steps = 0
+            ep_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
@@ -276,8 +291,11 @@ class seqDQN:
                 #     self.shared_target_DQN.load_state_dict(self.shared_DQN.state_dict())
 
                 if status:
+                    # learn step
+                    learn_steps += 1
                     # add to loss sum
-                    loss_sum = np.add(loss_sum, losses)
+                    np.add(loss_sum, losses, out = loss_sum)
+
                     # soft update / polyak update
                     target_state_dict = self.shared_target_DQN.state_dict()
                     policy_state_dict = self.shared_DQN.state_dict()
@@ -292,13 +310,20 @@ class seqDQN:
                 obs = next_obs
 
                 # keep track of steps
-                episode_steps += 1
-                if self.global_steps < self.eps_steps:
-                    self.global_steps += 1
+                self.global_steps += 1
+                ep_steps += 1
 
             # log
+            avg_loss = loss_sum / learn_steps
             reward_log.append(rew_sum)
-            loss_log.append(np.divide(loss_sum, episode_steps))
+            loss_log.append(loss_sum / learn_steps)
+            # tensorboard
+            rollout_log = {"reward_sum": rew_sum,
+                           "ep_len": ep_steps}
+            self.logger.log(rollout_log, self.global_steps, group = "rollout")
+            if learn_steps > 0:
+                logs = {"average_loss": avg_loss}
+                self.logger.log(logs, self.global_steps, group = "train")
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])

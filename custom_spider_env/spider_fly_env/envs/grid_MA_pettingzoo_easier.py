@@ -213,11 +213,11 @@ class SpiderFlyEnvMA(ParallelEnv):
         for side in sides:
             # collides with wall
             if any((coord < 0 or coord >= self.size) for coord in side):
-                pass
+                count += 1
             # spider
             elif (self._state[side] == SPIDER):
                 count += 1
-        if count == 2:
+        if count == self.nr_spiders:
             return True, count
         else:
             return False, count
@@ -230,13 +230,13 @@ class SpiderFlyEnvMA(ParallelEnv):
         # spider does nothing. The spiders move sequentially, so the new 
         # position of the previous spider will be used for deciding illigality.
         assert len(actions) > 0        
+        print(actions)
         for idx, (agent, action) in enumerate(actions.items()):
             self.take_action(idx, action)
 
         # render
         if self.render_mode == "ascii":
             self._print_state_matrix()
-            # print("LOCATIONS", self._fly_location, self._spider_locations)
 
         # check if terminal state has been reached
         terminal, occupied_sides = self.check_terminal()
