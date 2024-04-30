@@ -208,7 +208,7 @@ class seqDQN:
         actions = []
 
         # get epsilon
-        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps), 0) / self.eps_steps)
+        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps, 0)) / self.eps_steps)
         self.logger.log({"epsilon": current_eps}, self.global_steps, "train")
 
         with torch.no_grad():
