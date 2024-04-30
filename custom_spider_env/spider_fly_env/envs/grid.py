@@ -204,9 +204,8 @@ class SpiderFlyEnv(gym.Env):
         # get reward, each step 
         if terminal:
             reward = 1
-            self.reset(render = False)
         else:
-            reward = 0.001 * (occupied_sides - 4)
+            reward = 0.01 * (occupied_sides - 4)
 
         # truncations
         if self.max_steps == self.timestep:
@@ -223,16 +222,3 @@ class SpiderFlyEnv(gym.Env):
 
         # return obs, rew, done, truncated, info
         return observations, reward, terminal, truncation, {}
-
-        
-# # env = SpiderFlyEnv()
-# env = SpiderFlyEnv(render_mode = "ascii", multiagent=False)
-# rewards = 0
-# for i in range(100000):
-#     obs, rew, term, _, _ = env.step(np.random.randint(0,5, (env.nr_spiders,)))
-#     rewards += rew
-#     if term:
-#         print(i, rewards)
-#         break
-
-
