@@ -80,7 +80,7 @@ class seqDQN:
         # we need different optimizers for the different agents (mostly because of lower learning rate)
         self.optimizers = []
         for agent_idx in range(self.nr_agents):
-            self.optimizers.append(optim.Adam(self.shared_DQN.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr))
+            self.optimizers.append(optim.Adam(self.shared_DQN.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr, eps = 1e-8))
 
         # Replay buffer
         obs_size_list = [obs.shape for obs in env.observation_space]

@@ -59,7 +59,6 @@ class seqDoubleDQN:
         self.agent_ids = F.one_hot(torch.tensor(range(self.nr_agents)))
         # create batched size tensor to add to input
         self.agent_id_tensors = [self.agent_ids[agent_idx].unsqueeze(0).expand(batch_size, -1) for agent_idx in range(self.nr_agents)]
-        # print(self.agent_id_tensors[0], self.agent_id_tensors[1])
 
         # if not all agents receive global observations from env
         if not self.global_observations:
@@ -217,6 +216,10 @@ class seqDoubleDQN:
                 loss_Q_list.append(loss.detach().item())
                 Q_list.append(torch.mean(Q_taken_action).detach().item())
                 Q_target_list.append(torch.mean(Q_target).detach().item())
+            
+            Q_logs = {"Q": Q_list,
+                      "Q_target": Q_target_list}
+            self.logger.log(Q_logs, self.global_steps, "values")
 
         # return status 1
         return 1, loss_Q_list
@@ -227,8 +230,8 @@ class seqDoubleDQN:
         actions = []
 
         # get epsilon
-        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps), 0) / self.eps_steps)
-        self.logger.log({"epsilon", current_eps}, self.global_steps, "train")
+        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps, 0)) / self.eps_steps)
+        self.logger.log({"epsilon": current_eps}, self.global_steps, "train")
 
         with torch.no_grad():
             # make tensor if needed
@@ -293,8 +296,8 @@ class seqDoubleDQN:
             obs, _ = self.env.reset()
             terminals = [False]
             truncations = [False]
-            rew_sum = [0 for _ in range(self.nr_agents)]
-            loss_sum = [0 for _ in range(self.nr_agents)]
+            rew_sum = np.zeros(self.nr_agents)
+            loss_sum = np.zeros(self.nr_agents)
             
             # keep track of number of learning steps
             learn_steps = 0
@@ -302,7 +305,6 @@ class seqDoubleDQN:
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
-                # print("CHOSEN ACTIONS", actions)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
@@ -318,7 +320,7 @@ class seqDoubleDQN:
                     loss_sum = np.add(loss_sum, losses)
 
                 # add to reward sum
-                rew_sum = np.add(rew_sum, rewards)
+                np.add(rew_sum, rewards, out = rew_sum)
 
                 # update state
                 obs = next_obs
@@ -339,9 +341,7 @@ class seqDoubleDQN:
                 logs = {"average_loss": avg_loss}
                 self.logger.log(logs, self.global_steps, group = "train")
 
-
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])
-                print("eps: ", self.eps_end + (self.eps_start - self.eps_end) * ((self.eps_steps - self.global_steps) / self.eps_steps))
 
         return reward_log, loss_log

@@ -230,7 +230,6 @@ class SpiderFlyEnvMA(ParallelEnv):
         # spider does nothing. The spiders move sequentially, so the new 
         # position of the previous spider will be used for deciding illigality.
         assert len(actions) > 0        
-        print(actions)
         for idx, (agent, action) in enumerate(actions.items()):
             self.take_action(idx, action)
 
