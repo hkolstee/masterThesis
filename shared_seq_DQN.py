@@ -44,6 +44,9 @@ class seqDQN:
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
+        # logging utility
+        self.logger = Logger(env, log_dir)
+
         # starting epsilon
         self.eps = eps_start
         # count global steps for epsilon 
@@ -92,6 +95,8 @@ class seqDQN:
         
         # logging list for return of the function
         loss_Q_list = []
+        Q_list = []
+        Q_target_list = []
 
         # sample from buffer 
         #   list of batches (one for each agent, same indices out of buffer and therefore same multi-agent transition)
@@ -185,7 +190,14 @@ class seqDQN:
                 self.optimizers[agent_idx].step()
 
                 # log losses
-                loss_Q_list.append(loss.detach().numpy())
+                loss_Q_list.append(loss.detach().item())
+                Q_list.append(torch.mean(Q_taken_action).detach().item())
+                Q_target_list.append(torch.mean(Q_target).detach().item())
+
+            # log Q values
+            Q_logs = {"Q": Q_list,
+                      "Q_target": Q_target_list}
+            self.logger.log(Q_logs, self.global_steps, "values")
 
         # return status 1
         return 1, loss_Q_list
@@ -196,7 +208,8 @@ class seqDQN:
         actions = []
 
         # get epsilon
-        current_eps = self.eps_end + (self.eps_start - self.eps_end) * ((self.eps_steps - self.global_steps) / self.eps_steps)
+        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps), 0) / self.eps_steps)
+        self.logger.log({"epsilon": current_eps}, self.global_steps, "train")
 
         with torch.no_grad():
             # make tensor if needed
@@ -261,6 +274,7 @@ class seqDQN:
             loss_sum = np.zeros(self.nr_agents)
 
             learn_steps = 0
+            ep_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
                 actions = self.get_actions(obs)
@@ -296,12 +310,20 @@ class seqDQN:
                 obs = next_obs
 
                 # keep track of steps
-                if self.global_steps < self.eps_steps:
-                    self.global_steps += 1
+                self.global_steps += 1
+                ep_steps += 1
 
             # log
+            avg_loss = loss_sum / learn_steps
             reward_log.append(rew_sum)
             loss_log.append(loss_sum / learn_steps)
+            # tensorboard
+            rollout_log = {"reward_sum": rew_sum,
+                           "ep_len": ep_steps}
+            self.logger.log(rollout_log, self.global_steps, group = "rollout")
+            if learn_steps > 0:
+                logs = {"average_loss": avg_loss}
+                self.logger.log(logs, self.global_steps, group = "train")
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])
