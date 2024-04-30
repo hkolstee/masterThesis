@@ -246,7 +246,7 @@ class SpiderFlyEnvMA(ParallelEnv):
         if terminal:
             rewards = {a: 1 for a in self.possible_agents}
         else:
-            rewards = {a: 0.001 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
+            rewards = {a: 0.01 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
 
         # get observation
         observations = self._get_obs()
