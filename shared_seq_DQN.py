@@ -131,6 +131,8 @@ class seqDQN:
             # one_hot id (of current agent)
             input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
+        print("TRAINING STEP --------------")
+
         with torch.autograd.set_detect_anomaly(True):
             for agent_idx in range(self.nr_agents):
                 # we can use last used tensor in target Q as current Q input
@@ -139,7 +141,19 @@ class seqDQN:
                     input_tensor = targ_input_tensor.clone().detach()
 
                 # Q_i(s, a_1, ..., a_i)
-                Q_taken_action = self.shared_DQN(input_tensor).gather(1, replay_act[agent_idx].long())
+                print("---------------")
+                print("input tensor agent ", agent_idx)
+                print(input_tensor)
+                Q_vals = self.shared_DQN(input_tensor)
+                print("Qvals")
+                print(Q_vals)
+                print("taken action")
+                print(replay_act[agent_idx].long())
+                # Q_taken_action = self.shared_DQN(input_tensor).gather(1, replay_act[agent_idx].long())
+                Q_taken_action = Q_vals.gather(1, replay_act[agent_idx].long())
+                print("Taken Q_val")
+                print(Q_taken_action)
+                print("-----------------")
 
                 # TARGET Q values
                 with torch.no_grad():
@@ -160,10 +174,18 @@ class seqDQN:
                         targ_input_tensor[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
 
                         # max_a_i+1 Q*_i+1(s, a_1, ..., a_i+1)
-                        Q_next_agent = self.shared_target_DQN(targ_input_tensor).max(1).values
+                        print("target input tensor")
+                        print(targ_input_tensor)
+                        Q_vals = self.shared_target_DQN(targ_input_tensor)
+                        print("target Q vals")
+                        print(Q_vals)
+                        print("Max target Q vals")
+                        max_Q_next_agent = Q_vals.max(1).values
+                        print(max_Q_next_agent)
+                        # Q_next_agent = self.shared_target_DQN(targ_input_tensor).max(1).values
 
                         # we learn from the next agent Qvals only, with diminished learning rate
-                        Q_target = Q_next_agent
+                        Q_target = max_Q_next_agent
 
                     # for the last agent in the sequence, we compare with the temporal difference Q-val of the first agent.
                     else:
@@ -175,19 +197,31 @@ class seqDQN:
                         # one_hot id (of first agent !!)
                         targ_input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
+                        print("last target input tensor")
+                        print(targ_input_tensor)
+                        Q_vals = self.shared_target_DQN(targ_input_tensor)
+                        print("last target Q vals")
+                        print(Q_vals)
+                        print("Max target Q vals")
+                        max_Q_next_obs = Q_vals.max(1).values
+                        print(max_Q_next_agent)
+
                         # max_a' Q*_1(s', a')
-                        Q_next_obs = self.shared_target_DQN(targ_input_tensor).max(1).values
+                        # Q_next_obs = self.shared_target_DQN(targ_input_tensor).max(1).values
 
                         # normal temporal difference target
                         # Q_target = rewards + self.gamma * Q_next_obs
-                        Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * Q_next_obs
+                        print("rewards, dones, gamma", rewards, dones[agent_idx], self.gamma)
+                        Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * max_Q_next_obs
                 
                 # loss
                 loss = F.huber_loss(Q_taken_action, Q_target.unsqueeze(1))
                 # backward prop + gradient step
-                self.optimizers[agent_idx].zero_grad()
+                self.shared_DQN.optimizer.zero_grad()
+                # self.optimizers[agent_idx].zero_grad()
                 loss.backward()
-                self.optimizers[agent_idx].step()
+                self.shared_DQN.optimizer.step()
+                # self.optimizers[agent_idx].step()
 
                 # log losses
                 loss_Q_list.append(loss.detach().item())
@@ -204,6 +238,7 @@ class seqDQN:
 
 
     def get_actions(self, observations, deterministic = False):
+        print("GET ACTIONS -------")
         # action list
         actions = []
 
@@ -248,8 +283,11 @@ class seqDQN:
                     input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
 
                     # forward through DQN, take argmax for max action
+                    print("Input Tensor agent ", agent_idx)
+                    print(input_tensor.unsqueeze(0))    
                     actions.append(self.shared_DQN(input_tensor.unsqueeze(0)).argmax().item())
 
+            # print("action: ", actions[-1])
             # for all agents except the last we add the action to the input of the next
             if agent_idx < (self.nr_agents - 1):
                 # add selected action to tensor but first convert to onehot
@@ -258,6 +296,8 @@ class seqDQN:
                 input_tensor[seq_action_index : seq_action_index + current_action.shape[0]] = current_action
                 # move sequential index for the next action
                 seq_action_index += current_action.shape[0]
+            
+            print("last action sampled: ", actions[-1])
             
         return actions
 
@@ -282,13 +322,14 @@ class seqDQN:
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
                 # add transition to replay buffer
+                print("Transition added: ", obs, actions, rewards, next_obs, terminals)
                 self.replay_buffer.add_transition(obs, actions, rewards, next_obs, terminals)
 
                 # learning step
                 status, losses = self.learn()
 
-                # if step % 1000 == 0:
-                #     self.shared_target_DQN.load_state_dict(self.shared_DQN.state_dict())
+                # update state
+                obs = next_obs
 
                 if status:
                     # learn step
@@ -305,9 +346,6 @@ class seqDQN:
 
                 # add to reward sum
                 rew_sum = np.add(rew_sum, rewards)
-
-                # update state
-                obs = next_obs
 
                 # keep track of steps
                 self.global_steps += 1

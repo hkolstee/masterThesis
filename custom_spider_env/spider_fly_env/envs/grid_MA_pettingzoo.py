@@ -43,22 +43,21 @@ class SpiderFlyEnvMA(ParallelEnv):
         self.timestep = 0
         self.max_steps = max_timesteps
 
-        # grid locations are integers [x,y], x,y in [0,..,size - 1].
-        # each spider sees all spider locations and fly location
-        spider_obs = spaces.Box(0, self.size - 1, (2 * self.nr_spiders + 2 * self.nr_flies,), dtype = np.int64)
-
-        # multi-agent observations, agent (spider) gets all spider locs + fly loc
-        # action space is 5 (left, right, up, down, nothing) for each spider
+        # create observation/action spaces 
         self.observation_spaces = dict()
         self.action_spaces = dict()
         self.agents = list()
         for agent_idx in range(self.nr_spiders):
             # agent name string
             agent = "spider_" + str(agent_idx)
-
-            self.observation_spaces[agent] = copy.deepcopy(spider_obs)
-            self.action_spaces[agent] = spaces.Discrete(5)
             self.agents.append(agent)
+
+            # grid locations are integers [x,y], x,y in [0,..,size - 1].
+            # each spider sees all spider locations and fly locations (in coordinates) 
+            self.observation_spaces[agent] = spaces.Box(0, self.size - 1, (2 * self.nr_spiders + 2 * self.nr_flies,), dtype = np.int64)
+            # action space is 5 (left, right, up, down, nothing) for each spider
+            self.action_spaces[agent] = spaces.Discrete(5)
+
 
         # mapping from action to direction of this action on the grid (=delta (x, y))
         self._action_to_direction = {
@@ -67,6 +66,15 @@ class SpiderFlyEnvMA(ParallelEnv):
             2: np.array([-1, 0]),   # left
             3: np.array([0, 1]),    # up
             4: np.array([0, -1]),   # down
+        }
+
+        # for use when debugging
+        self.action_to_direction_string = {
+            0: "nothing",        
+            1: "right",
+            2: "left",
+            3: "up",
+            4: "down",
         }
 
         # render mode
@@ -99,7 +107,7 @@ class SpiderFlyEnvMA(ParallelEnv):
 
     def _get_obs(self):
         # append flattens by itself
-        return {a: list(np.append(self._spider_locations, self._fly_location)) for a in self.possible_agents}
+        return {a: list(np.append(self._spider_locations, self._fly_locations)) for a in self.possible_agents}
 
     def _get_spider_locations(self):
         return {a: self._spider_locations[agent_idx] for (agent_idx, a) in enumerate(self.agents)}
@@ -108,10 +116,13 @@ class SpiderFlyEnvMA(ParallelEnv):
         self._state = np.zeros((self.size, self.size))
 
         # fly
-        self._state[self._fly_location[0], self._fly_location[1]] = FLY
+        if len(self._fly_locations) > 0:
+            for fly_loc in self._fly_locations:
+                self._state[fly_loc[0], fly_loc[1]] = FLY
         # spiders
-        for spider_loc in self._spider_locations:
-            self._state[spider_loc[0], spider_loc[1]] = SPIDER
+        if len(self._spider_locations) > 0:
+            for spider_loc in self._spider_locations:
+                self._state[spider_loc[0], spider_loc[1]] = SPIDER
 
     def _print_state_matrix(self):
         # erase previous print
@@ -121,7 +132,29 @@ class SpiderFlyEnvMA(ParallelEnv):
             for y in range(self.size):
                 content[x,y] = self._id_to_ascii[self._state[x,y]]
         # print char array
-        print(content)
+        print(np.rot90(content))
+
+    def _add_spiders(self, number):
+        # add spiders randomly on empty locations
+        for _ in range(number):
+            loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+            while loc in self._spider_locations or loc in self._fly_locations:
+                loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+                
+            # also add to state matrix
+            self._state[tuple(loc)] = SPIDER
+            self._spider_locations.append(loc)
+        
+    def _add_flies(self, number):
+        # add flies randomly on empty locations
+        for _ in range(number):
+            loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+            while loc in self._spider_locations or loc in self._fly_locations:
+                loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+
+            # also add to state matrix
+            self._state[tuple(loc)] = FLY
+            self._fly_locations.append(loc)
 
     def reset(self, seed = None, options = None):
         # set np random seed
@@ -134,28 +167,20 @@ class SpiderFlyEnvMA(ParallelEnv):
             agent = "spider_" + str(agent_idx)
             self.agents.append(agent)
 
-        # random spider/fly locations 
-        spawn_locs = set()
+        # initialize locations
         self._spider_locations = []
-        # random spider locations but can't already be a location of another spider
-        # set() because faster (eventhough its not needed)
-        for _ in range(self.nr_spiders):
-            loc = self.rng.integers(0, self.size, size = (2,))
-            while tuple(loc) in spawn_locs:
-                loc = self.rng.integers(0, self.size, size = (2,))
-            spawn_locs.add(tuple(loc))
-            self._spider_locations.append(loc)
-        # fly also has to spawn on a free space
-        loc = self.rng.integers(0, self.size, size = (2,))
-        while tuple(loc) in spawn_locs:
-            loc = self.rng.integers(0, self.size, size = (2,))
-        self._fly_location = loc
-        
-        # get observations
-        observations = self._get_obs()
+        self._fly_locations = []
 
         # create state matrix
         self._create_state_matrix()
+
+        # random spider/fly locations 
+        # random spider locations but can't already be a location of another spider
+        # set() because faster (eventhough its not needed)
+        self._add_flies(self.nr_flies)
+        self._add_spiders(self.nr_spiders)
+        # get observations
+        observations = self._get_obs()
 
         if self.render_mode == "ascii":
             # print grid, spiders, and flies 
@@ -181,50 +206,72 @@ class SpiderFlyEnvMA(ParallelEnv):
         if all((coord >= 0 and coord < self.size) for coord in new_loc):
             # check for other spiders and fly, checking own loc is fine as it moves
             if not np.any(np.all(new_loc == self._spider_locations, axis = 1)):
-                if not np.array_equal(new_loc, self._fly_location):
+                if not np.any(np.all(new_loc == self._fly_locations, axis = 1)):
                     # wants to move to empty location so we allow
                     # first update state matrix
                     self._state[self._spider_locations[spider_idx][0], self._spider_locations[spider_idx][1]] = EMPTY
                     self._state[new_loc[0], new_loc[1]] = SPIDER
                     # change loc in list
-                    self._spider_locations[spider_idx] = new_loc
+                    self._spider_locations[spider_idx] = new_loc.tolist()
 
-    def move_fly(self):
-        new_loc = self._fly_location + self._action_to_direction[self.rng.integers(0, 5)]
-        # check within walls
-        if all((coord >= 0 and coord < self.size) for coord in new_loc):
-            # check not on other spider
-            if not np.any(np.all(new_loc == self._spider_locations, axis = 1)):
-                # move
-                # first update state matrix
-                self._state[self._fly_location[0], self._fly_location[1]] = EMPTY
-                self._state[new_loc[0], new_loc[1]] = FLY
-                # change loc in list
-                self._fly_location = new_loc
+    def move_flies(self):
+        for idx, fly_loc in enumerate(self._fly_locations):
+            # random direction
+            new_loc = fly_loc + self._action_to_direction[self.rng.integers(0, 5)]
+            # check within walls
+            if all((coord >= 0 and coord < self.size) for coord in new_loc):
+                # check not on other spider or fly
+                if not np.any(np.all(new_loc == self._spider_locations, axis = 1)):
+                    if not np.any(np.all(new_loc == self._fly_locations, axis = 1)):
+                        # move
+                        # first update state matrix
+                        self._state[fly_loc[0], fly_loc[1]] = EMPTY
+                        self._state[new_loc[0], new_loc[1]] = FLY
+                        # change loc in list
+                        self._fly_locations[idx] = new_loc
 
-    def check_terminal(self):
-        # create set of locations around fly
-        sides = [tuple(side) for side in [self._action_to_direction[action] + self._fly_location for action in [1, 2, 3, 4]]]
-        # check in grid array if flies are on these possible possitions
-        count = 0
-        spider_rew = np.repeat(-1, self.nr_spiders)
-        for side in sides:
-            # collides with wall
-            if any((coord < 0 or coord >= self.size) for coord in side):
-                count += 1
-            # spider
-            elif (self._state[side] == SPIDER):
-                count += 1
-                for (idx, loc) in enumerate(self._spider_locations):
-                    if tuple(loc) == side:
-                        spider_rew[idx] = 1
-        # if all sides are occupied
-        if count == 4:
-            return True, count, spider_rew
-        else:
-            return False, count, spider_rew
+    def move_fly_random_loc(self, idx):
+        loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+        while loc in self._spider_locations or loc in self._fly_locations:
+            loc = self.rng.integers(0, self.size, size = (2,)).tolist()
+        
+        # first update state matrix
+        self._state[self._fly_locations[idx][0], self._fly_locations[idx][1]] = EMPTY
+        self._state[loc[0], loc[1]] = FLY
+        # found free spot
+        self._fly_locations[idx] = loc
+
+    def check_caught(self):
+        flies_caught = [False for _ in range(len(self._fly_locations))]
+
+        for fly_idx, fly_loc in enumerate(self._fly_locations):
+            # create set of locations around fly
+            sides = [tuple(side) for side in [self._action_to_direction[action] + fly_loc for action in [1, 2, 3, 4]]]
+            # check in grid array if spiders are on these possible possitions
+            count = 0
+            spider_rew = np.repeat(-2, self.nr_spiders)
+            for side in sides:
+                # collides with wall
+                if any((coord < 0 or coord >= self.size) for coord in side):
+                    count += 1
+                # spider
+                elif (self._state[side] == SPIDER):
+                    count += 1
+                    for (spider_idx, loc) in enumerate(self._spider_locations):
+                        if tuple(loc) == side:
+                            spider_rew[spider_idx] = 1
+            # if all sides are occupied
+            if count == 4 or sum(spider_rew) == self.nr_spiders:
+                flies_caught[fly_idx] = True
+                # remove fly and spawn somewhere else
+                self.move_fly_random_loc(fly_idx)
+        
+        return flies_caught, spider_rew
 
     def step(self, actions):
+        # add step to counter
+        self.timestep += 1
+
         # we move the fly first
         # self.move_fly()
 
@@ -240,20 +287,21 @@ class SpiderFlyEnvMA(ParallelEnv):
             self._print_state_matrix()
 
         # check if terminal state has been reached
-        terminal, occupied_sides, spiders_rew = self.check_terminal()
+        flies_caught, spiders_rew = self.check_caught()
 
         # get reward, each step 
-        if terminal:
+        if any(flies_caught):
             rewards = {a: 1 for a in self.possible_agents}
+            # terminals = {a: True for a in self.possible_agents}
         else:
-            rewards = {a: 0.01 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
+            rewards = {a: 0.001 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
 
         # get observation
         observations = self._get_obs()
         # infos
         infos = {a: {} for a in self.possible_agents}
         # terminals
-        terminals = {a: terminal for a in self.possible_agents}
+        terminals = {a: False for a in self.possible_agents}
         # truncations
         if self.max_steps == self.timestep:
             truncations = {a: True for a in self.possible_agents}
@@ -264,9 +312,6 @@ class SpiderFlyEnvMA(ParallelEnv):
         # also needed for pettingzoo api
         if any(terminals.values()) or all(truncations.values()):
             self.agents = []
-
-        # add step to counter
-        self.timestep += 1
 
         # return obs, rew, done, truncated, info
         return observations, rewards, terminals, truncations, infos
