@@ -107,7 +107,7 @@ class SpiderFlyEnvMA(ParallelEnv):
 
     def _get_obs(self):
         # append flattens by itself
-        return {a: list(np.append(self._spider_locations, self._fly_locations)) for a in self.possible_agents}
+        return {a: np.array(np.append(self._spider_locations, self._fly_locations)) for a in self.possible_agents}
 
     def _get_spider_locations(self):
         return {a: self._spider_locations[agent_idx] for (agent_idx, a) in enumerate(self.agents)}

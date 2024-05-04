@@ -3,6 +3,10 @@ import sys
 
 from gym import Wrapper
 
+import numpy as np
+
+from supersuit import normalize_obs_v0, dtype_v0
+
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
@@ -15,8 +19,12 @@ class PettingZooWrapper(Wrapper):
     A wrapper class to correct the output of the pettingzoo env to a gymnasium-like env
     using lists instead of dictionaries.
     """
-    def __init__(self, env: SpiderFlyEnvMA):
-        super().__init__(env)
+    def __init__(self, env: SpiderFlyEnvMA, normalize = False):
+        if normalize:
+            self.env = normalize_obs_v0(dtype_v0(env, np.float32))
+        else:
+            self.env = env
+        super().__init__(self.env)
         self.env = env
 
     def reset(self):
@@ -27,6 +35,7 @@ class PettingZooWrapper(Wrapper):
         observations, _ = self.env.reset()
 
         return list(observations.values()), {}
+        # return np.array(observations.values()), {}
 
     
     def step(self, actions):
@@ -53,7 +62,7 @@ class PettingZooWrapper(Wrapper):
                list(dones.values()), \
                list(truncations.values()), \
                list(infos.values())
-    
+
     @property
     def observation_space(self):
         """

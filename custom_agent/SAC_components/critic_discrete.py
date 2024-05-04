@@ -32,6 +32,6 @@ class Critic(MultiLayerPerceptron):
                          optim_eps = optim_eps)
         
     def forward(self, obs):
-        out = super().forward(obs.float())[0]
+        out = super().forward(obs)[0]
                 
         return out
