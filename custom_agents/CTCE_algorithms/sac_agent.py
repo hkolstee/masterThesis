@@ -9,21 +9,19 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 # temporary needed
-from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
+from custom_agents.utils.citylearn_wrapper import CityLearnWrapper
 from custom_reward.custom_reward import CustomReward
-
-from gymnasium import spaces
 
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-from ..SAC_components.replay_buffer import ReplayBuffer
-from ..SAC_components.critic_discrete import Critic
-from ..SAC_components.actor_discrete import DiscreteActor
-from ..SAC_components.logger import Logger
-from ..SAC_components.autoencoder import AutoEncoder
+from ..replay_buffers.replay_buffer import ReplayBuffer
+from ..networks.critic import Critic
+from ..networks.actor import Actor
+from ..utils.logger import Logger
+# from ..networks.autoencoder import AutoEncoder
 
 from copy import deepcopy
 
@@ -71,16 +69,13 @@ class Agent:
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
-        act_size = env.action_space.n 
-        obs_size = env.observation_space.shape[0]
-
         # initialize replay buffer
         self.replay_buffer = ReplayBuffer(buffer_max_size, env.observation_space.shape, env.action_space.shape, batch_size)
 
         # initialize networks
-        self.actor = DiscreteActor(lr_actor, obs_size, act_size)
-        self.critic1 = Critic(lr_critic, obs_size, act_size, layer_sizes)
-        self.critic2 = Critic(lr_critic, obs_size, act_size, layer_sizes)
+        self.actor = Actor(lr_actor, env.observation_space.shape[0], env.action_space.shape[0], env.action_space.low, env.action_space.high, layer_sizes)
+        self.critic1 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
+        self.critic2 = Critic(lr_critic, env.observation_space.shape[0], env.action_space.shape[0], layer_sizes)
 
         # make copy target critic networks which only get updated using polyak averaging
         self.critic1_targ = deepcopy(self.critic1)
@@ -91,9 +86,8 @@ class Agent:
         for params in self.critic2_targ.parameters():
             params.requires_grad = False
 
-        # target entropy for automatic entropy coefficient adjustment (from cleanRL)
-        # self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
-        self.entropy_targ = -act_size
+        # target entropy for automatic entropy coefficient adjustment
+        self.entropy_targ = torch.tensor(-np.prod(self.env.action_space.shape), dtype=torch.float32).to(self.device)
         # the entropy coef alpha which is to be optimized
         self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor
         self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr = lr_critic)   # shares critic lr
@@ -125,8 +119,6 @@ class Agent:
         
         # sample from buffer
         obs, replay_act, rewards, next_obs, dones = self.replay_buffer.sample()
-        # print("obs", obs)
-        # print("ract", replay_act)
 
         # prepare tensors
         obs = torch.tensor(obs, dtype=torch.float32).to(self.device)
@@ -136,15 +128,14 @@ class Agent:
         dones = torch.tensor(dones, dtype=torch.int32).to(self.device)
 
         # compute current policy action for pre-transition observation
-        _, log_prob_prev_obs, probs_prev_obs = self.actor.action_distr_sample(obs)
-        # print("p", probs_prev_obs)
+        policy_act_prev_obs, log_prob_prev_obs = self.actor.normal_distr_sample(obs)
 
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
         # we detach because otherwise we backward through the graph of previous calculations using log_prob
         #   which also raises an error fortunately, otherwise I would have missed this
         # alpha_loss = (-self.log_alpha * log_prob_prev_obs.detach() - self.log_alpha * self.entropy_targ).mean()
-        alpha_loss = (probs_prev_obs.detach() * (-self.log_alpha.exp() * log_prob_prev_obs.detach() - self.log_alpha.exp() * self.entropy_targ)).mean()
+        alpha_loss = (-self.log_alpha.exp() * log_prob_prev_obs.detach() - self.log_alpha.exp() * self.entropy_targ).mean()
         
         # backward prop + gradient step
         self.alpha_optimizer.zero_grad()
@@ -156,27 +147,21 @@ class Agent:
 
         # CRITIC GRADIENT
         # These Q values are the left hand side of the loss function
-        q1_buffer = self.critic1.forward(obs)
-        q2_buffer = self.critic2.forward(obs)
+        q1_buffer = self.critic1.forward(obs, replay_act)
+        q2_buffer = self.critic2.forward(obs, replay_act)
         
         # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
         with torch.no_grad():
             # targets from current policy (old policy = buffer)
-            _, log_prob_next_obs, probs_next_obs = self.actor.action_distr_sample(next_obs)
+            policy_act_next_obs, log_prob_next_obs = self.actor.normal_distr_sample(next_obs)
 
             # target q values
-            q1_policy_targ = self.critic1_targ.forward(next_obs)
-            q2_policy_targ = self.critic2_targ.forward(next_obs)
-            # Clipped double Q trick
-            min_q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
-            # Action probabilities can be used to estimate the expectation (cleanRL)
-            q_targ =  (probs_next_obs * (min_q_targ - self.alpha.unsqueeze(1) * log_prob_next_obs)).sum(dim = 1)
+            q1_policy_targ = self.critic1_targ.forward(next_obs, policy_act_next_obs)
+            q2_policy_targ = self.critic2_targ.forward(next_obs, policy_act_next_obs)
+            # clipped double Q trick
+            q_targ = torch.minimum(q1_policy_targ, q2_policy_targ)
             # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * (q_targ)
-
-        # use only Q-values of the chosen action
-        q1_buffer = q1_buffer.gather(1, replay_act.long().unsqueeze(1)).squeeze()
-        q2_buffer = q2_buffer.gather(1, replay_act.long().unsqueeze(1)).squeeze()
+            bellman = rewards + self.gamma * (1 - dones) * (q_targ - self.alpha * log_prob_next_obs)
 
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = functional.mse_loss(q1_buffer, bellman)
@@ -198,14 +183,13 @@ class Agent:
             params.requires_grad = False
 
         # compute Q-values
-        q1_policy = self.critic1.forward(obs)
-        q2_policy = self.critic2.forward(obs)
+        q1_policy = self.critic1.forward(obs, policy_act_prev_obs)
+        q2_policy = self.critic2.forward(obs, policy_act_prev_obs)
         # take min of these two 
         #   = clipped Q-value for stable learning, reduces overestimation
         q_policy = torch.minimum(q1_policy, q2_policy)
         # entropy regularized loss
-        # no need for reparameterization, the expectation can be calculated for discrete actions (cleanRL)
-        loss_policy = (probs_prev_obs * (self.alpha.unsqueeze(1) * log_prob_prev_obs - q_policy)).sum(1).mean()
+        loss_policy = (self.alpha * log_prob_prev_obs - q_policy).mean()
 
         # backward prop + gradient step
         self.actor.optimizer.zero_grad()
@@ -246,9 +230,9 @@ class Agent:
 
         # get actor action
         with torch.no_grad():
-            action, _, _ = self.actor.action_distr_sample(obs, reparameterize, deterministic)
+            actions, _ = self.actor.normal_distr_sample(obs, reparameterize, deterministic)
 
-        return np.argmax(action.cpu().detach().numpy()[0])
+        return actions.cpu().detach().numpy()[0]
     
     def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
               checkpoint = 100000, save_dir = "models"):
@@ -286,11 +270,10 @@ class Agent:
             else: 
                 # get action
                 action = self.get_action(obs)
-                # print(action)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(action)
-
+            
             # step increment 
             ep_steps += 1
             # reward addition to total sum
@@ -325,9 +308,8 @@ class Agent:
                             "avg_policy_entr": avg_policy_entr}
                     self.logger.log(logs, step, group = "train")
                 # log reward seperately
-                rollout_log = {"reward_sum": ep_rew_sum,
-                               "ep_len": ep_steps}
-                self.logger.log(rollout_log, step, "rollout")
+                reward_log = {"reward_sum": ep_rew_sum}
+                self.logger.log(reward_log, step, "Reward")
 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
                 if self.citylearn:
