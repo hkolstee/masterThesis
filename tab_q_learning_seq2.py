@@ -42,11 +42,6 @@ class SequentialTabularQLearning:
         # between agents judgement of the state plus previous agent decisions. The last agent learns
         # from the TD-error between its own Q-value and the Q-value of the first agent in the 
         # sequence on the next state and best action.  
-        # print(obs, action)
-        # seq_obs = obs + action[: agent_idx + 1]
-        # print(seq_obs)
-        # print(tuple(obs))
-        # sys.exit()
         if agent_idx < (self.nr_agents - 1):
             # Max Q val of possible actions of next agent in sequence given action of current agent in sequence
             maxQ_next_agent = np.max(self.q_tables[agent_idx + 1][tuple(obs)][tuple(actions[:agent_idx + 1])])
@@ -62,8 +57,6 @@ class SequentialTabularQLearning:
             # Max Q val of possible actions on next state of first agent in sequence
             maxQ_next_obs = np.max(self.q_tables[0][tuple(next_obs)])
             # Q val of action taken on current state of last agent in sequence
-            # print(self.q_tables[agent_idx].shape)
-            # print(agent_idx, tuple(obs), tuple(actions))
             Q_taken_action = self.q_tables[agent_idx][tuple(obs)][tuple(actions)]
 
             # Here target is taken as the normal temporal difference target with next state,

@@ -40,6 +40,7 @@ class TabularQLearning:
         # Q val of action taken on current state
         Q_taken_action = self.q_tables[agent_idx][tuple(obs)][action]
 
+        # mean reward to make reward function global among agents
         td_target = np.mean(reward) + self.gamma * maxQ_next_obs
         td_error = td_target - Q_taken_action
         # update

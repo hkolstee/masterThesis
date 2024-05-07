@@ -11,7 +11,7 @@ class RLbase(ABC):
     @abstractmethod
     def get_action(self):
         """
-        This functions should return actions for (a) given observation(s).
+        This functions should return actions for a given (set of) observation(s).
         """
         pass
     

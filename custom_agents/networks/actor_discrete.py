@@ -1,11 +1,14 @@
 import os
-
-import numpy as np
+import sys
 
 import torch
-import torch.nn.functional as functional
 
-from MLP import MultiLayerPerceptron
+# add folder to python path for relative imports
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+sys.path.append(dname)
+
+from ..networks.MLP import MultiLayerPerceptron
 
 class DiscreteActor(MultiLayerPerceptron):
     """An actor network that is a policy function from the state action pair to a discrete action.
@@ -19,17 +22,17 @@ class DiscreteActor(MultiLayerPerceptron):
             such that we get the appropriate action value
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, act_size, layer_sizes = (256, 256), eps = 1e-4):
+    def __init__(self, lr, obs_size, action_size, layer_sizes = (256, 256), eps = 1e-4):
         super().__init__(lr = lr,
                          input_size = obs_size, 
-                         output_size = act_size, 
+                         output_size = action_size, 
                          layer_sizes = layer_sizes,
                          optim_eps = eps)
         # gumbel temperature (tau)
         self.gumbel_temperature = 1.0
 
         # action list to take dot product with onehot action vector
-        self.action_categories = torch.tensor([i for i in range(act_size)], dtype = torch.float32)
+        self.action_categories = torch.tensor([i for i in range(action_size)], dtype = torch.float32)
 
     def set_gumbel_temperature(self, temperature):
         self.gumbel_temperature = temperature
@@ -41,7 +44,7 @@ class DiscreteActor(MultiLayerPerceptron):
         # return prob_distr, log_std
         return action_logits
 
-    def action_distr_sample(self, obs, reparameterize = True, deterministic = False):
+    def action_distr_sample(self, obs):
         action_logits = self.forward(obs)
 
         prob_distr = torch.distributions.OneHotCategorical(logits = action_logits)

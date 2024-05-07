@@ -1,11 +1,17 @@
 import os
+import sys
 
 import numpy as np
 
 import torch
 import torch.nn.functional as functional
 
-from MLP import MultiLayerPerceptron
+# add folder to python path for relative imports
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+sys.path.append(dname)
+
+from ..networks.MLP import MultiLayerPerceptron
 
 class Actor(MultiLayerPerceptron):
     """An actor network that is a policy function from the state action pair to an action.

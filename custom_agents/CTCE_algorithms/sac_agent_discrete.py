@@ -88,7 +88,7 @@ class Agent:
             params.requires_grad = False
 
         # target entropy for automatic entropy coefficient adjustment (from cleanRL)
-        # self.entropy_targ = -0.89 * torch.log(1 / torch.tensor(act_size))
+        # self.entropy_targ = -0.98 * torch.log(1 / torch.tensor(act_size))
         self.entropy_targ = -act_size
         # the entropy coef alpha which is to be optimized
         self.log_alpha = torch.ones(1, requires_grad = True, device = self.device)  # adding to device this way makes the tensor not a leaf tensor

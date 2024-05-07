@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 # temporary needed
-from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
+from custom_agents.utils.citylearn_wrapper import CityLearnWrapper
 from custom_reward.custom_reward import CustomReward
 
 from citylearn.citylearn import CityLearnEnv
@@ -23,10 +23,10 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-from ..SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
-from ..SAC_components.critic_discrete import Critic
-from ..SAC_components.actor_discrete import DiscreteActor
-from ..SAC_components.logger import Logger
+from ..replay_buffers.ma_replay_buffer import MultiAgentReplayBuffer
+from ..networks.critic import Critic
+from ..networks.actor_discrete import DiscreteActor
+from ..utils.logger import Logger
 
 from copy import deepcopy
 
@@ -109,15 +109,17 @@ class Agents:
         # Two centralized critics (Double Q learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
         self.actor = DiscreteActor(lr = lr_actor,
                                    obs_size = obs_size_global + sum(self.action_sizes[:-1]) + self.agent_ids.shape[0],
-                                   act_size = self.env.action_space[0].n,
+                                   action_size = self.env.action_space[0].n,
                                    layer_sizes = layer_sizes)
         self.critic1 = Critic(lr = lr_critic,
                               obs_size = obs_size_global + sum(self.action_sizes[:-1]) + self.agent_ids.shape[0],
                               act_size = self.env.action_space[0].n,
+                              discrete = True,
                               layer_sizes = layer_sizes)
         self.critic2 = Critic(lr = lr_critic,
                               obs_size = obs_size_global + sum(self.action_sizes[:-1]) + self.agent_ids.shape[0],
                               act_size = self.env.action_space[0].n,
+                              discrete = True,
                               layer_sizes = layer_sizes)
         
         # actor outputs onehot vectors for the actions, we can multiply it with this vector using torch.matmul to get the indices, while keeping grad
@@ -222,6 +224,8 @@ class Agents:
             # one_hot id (of current agent) at the end of tensor
             input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
+        # print("--------------------------------------")
+
         with torch.autograd.set_detect_anomaly(True):
             # SEQUENTIALLY update shared critics/actor for each agent
             for agent_idx in range(self.nr_agents):
@@ -234,9 +238,13 @@ class Agents:
 
                 # --- CRITIC GRADIENT ---
                 # Q values to measure against target
+                # print("INPUT AGENT ", agent_idx)
+                # print(input_tensor)
                 q1 = self.critic1(input_tensor)
                 q2 = self.critic2(input_tensor)
 
+                # NOTE: WE CAN REUSE THE OUTPUT OF TARGET NETWORK AS WELL, INSTEAD OF ONLY INPUT OF TARGET NETWORK, JUST TAKE
+                #   THE CHOSEN ACTION Q-VAL INSTEAD OF MAX
                 with torch.no_grad():
                     if agent_idx < (self.nr_agents - 1):
                         """
@@ -252,11 +260,16 @@ class Agents:
                         # add additional actions
                         current_action = F.one_hot(replay_act[agent_idx], num_classes = self.actor.output_size).squeeze(1)
                         targ_input_tensor[:, seq_action_index : seq_action_index + current_action.shape[1]] = current_action
-                        # move index (NOTE MAYBE)
+                        # move index 
                         seq_action_index += current_action.shape[1]
 
                         # we also need to change the onehot id in the tensor
                         targ_input_tensor[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
+
+                        # print("TARGET INPUT" )
+                        # print(targ_input_tensor)
+                        # print("ACTIONs")
+                        # print(replay_act[agent_idx])
 
                         # get actor output of next stage in sequence
                         act_ip1, logp_ip1, probs_ip1 = self.actor.action_distr_sample(targ_input_tensor)
@@ -287,6 +300,9 @@ class Agents:
 
                         # add next observation
                         targ_input_tensor[:, 0 : next_obs.shape[1]] = next_obs
+
+                        # print("LAST TARGET INPUT" )
+                        # print(targ_input_tensor)
 
                         # get actor output of first stage/agent in sequence
                         act_0_nextobs, logp_0_nextobs, probs_0_nextobs = self.actor.action_distr_sample(targ_input_tensor)
@@ -423,7 +439,7 @@ class Agents:
                 input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
 
                 # sample action from policy
-                actions, _, _ = self.actor.action_distr_sample(input_tensor.unsqueeze(0), reparameterize, deterministic)
+                actions, _, _ = self.actor.action_distr_sample(input_tensor.unsqueeze(0))
                     
                 # add to list, convert from one hot to integer
                 action_list.append(torch.argmax(actions).item())

@@ -147,7 +147,6 @@ class Agents:
         # logging lists for return of the function
         loss_policy_list = []
         loss_critic_list = []
-        log_prob_list = []
         alpha_list = []
         alpha_loss_list = []
         
@@ -271,7 +270,6 @@ class Agents:
             # log each agent's values
             loss_policy_list.append(loss_policy.cpu().detach().numpy())
             loss_critic_list.append(loss_critic.cpu().detach().numpy())
-            log_prob_list.append(log_prob_prev_obs[agent_idx].cpu().detach().numpy().mean())
             alpha_list.append(alpha.cpu().detach().numpy()[0])
             alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
             
@@ -286,7 +284,7 @@ class Agents:
                 # make tensor and send to device
                 obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
                 # sample action from policy
-                actions, _ = actor.normal_distr_sample(obs, reparameterize, deterministic)
+                actions, _ = actor.action_distr_sample(obs, reparameterize, deterministic)
                 # add to list
                 action_list.append(actions.cpu().detach().numpy()[0])
 
