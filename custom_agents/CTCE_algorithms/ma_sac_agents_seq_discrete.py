@@ -124,17 +124,6 @@ class Agents:
         # actor outputs onehot vectors for the actions, we can multiply it with this vector using torch.matmul to get the indices, while keeping grad
         self.action_categories = torch.tensor([i for i in range(self.actor.output_size)], dtype = torch.float32)
 
-        # optimizers
-        self.actor_optimizers = []
-        self.critic1_optimizers = []
-        self.critic2_optimizers = []
-        for agent_idx in range(self.nr_agents):
-            # learning rate should anneal when going through more depth in sequence, lowest at actor/ciritc 1
-            #   because the last agent in sequence gets the actual reward signal (for now) so it should learn faster
-            self.actor_optimizers.append(optim.Adam(self.actor.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_actor))
-            self.critic1_optimizers.append(optim.Adam(self.critic1.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_critic))
-            self.critic2_optimizers.append(optim.Adam(self.critic2.parameters(), lr = ((agent_idx + 1) / self.nr_agents) * lr_critic))
-
         # make copy target critic networks which only get updated using polyak averaging
         self.critic1_targ = deepcopy(self.critic1)
         self.critic2_targ = deepcopy(self.critic2)
@@ -198,7 +187,7 @@ class Agents:
         replay_act = [torch.tensor(actions, dtype=torch.int64).to(self.device) for actions in replay_act_list]
         # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
         # NOTE: need to find a nice way to incorporate individual reward components into the intermediate losses
-        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0)
+        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0).to(self.device)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
 
         # if we are not given the global observation, for each agent, and we need to construct it
@@ -217,7 +206,7 @@ class Agents:
         # preconstruct input tensors to which the sequential actions will be added, and onehot ids will be changed
         with torch.no_grad():
             # prepare input
-            input_tensor = torch.zeros((self.batch_size, self.actor.input_size))
+            input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
             # observations first
             input_tensor[:, 0 : obs.shape[1]] = obs
             # one_hot id (of current agent) at the end of tensor
@@ -233,7 +222,7 @@ class Agents:
                     input_tensor = targ_input_tensor.clone().detach()
 
                 # get alpha for remainder of this agent loop
-                alpha_i = torch.exp(self.log_alphas[agent_idx].detach())
+                alpha_i = torch.exp(self.log_alphas[agent_idx].detach()).to(self.device)
 
                 # --- CRITIC GRADIENT ---
                 # Q values to measure against target
@@ -292,7 +281,7 @@ class Agents:
                         alpha_0 = torch.exp(self.log_alphas[0].detach())
 
                         # create new target tensors
-                        targ_input_tensor = torch.zeros((self.batch_size, self.actor.input_size))
+                        targ_input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
 
                         # we also need to change the onehot id in the tensor to the first in sequence
                         targ_input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]

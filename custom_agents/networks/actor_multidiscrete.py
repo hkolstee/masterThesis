@@ -1,20 +1,18 @@
 import os
 import sys
 
-import numpy as np
-
 import torch
-import torch.nn.functional as functional
 
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-from ..networks.MLP import MultiLayerPerceptron
+from MLP import MultiLayerPerceptron
 
-class Actor(MultiLayerPerceptron):
-    """An actor network that is a policy function from the state action pair to an action.
+class MultiDiscreteActor(MultiLayerPerceptron):
+    """An actor network that is a policy function from the state action pair to a discrete action.
+    Output is a softmax over actions, of which actions are sampled, entropy is entropy over softmax. 
 
     Args:
         lr (float): Learning rate
@@ -24,91 +22,46 @@ class Actor(MultiLayerPerceptron):
             such that we get the appropriate action value
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, action_size, action_low, action_high, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, action_size, layer_sizes = (256, 256), eps = 1e-4):
         super().__init__(lr = lr,
                          input_size = obs_size, 
-                         output_size = (action_size, action_size), 
-                         layer_sizes = layer_sizes)
-        # action scaling
-        self.action_high = torch.tensor(action_high, dtype = torch.float32).to(self.device)
-        self.action_low = torch.tensor(action_low, dtype = torch.float32).to(self.device)
-        self.std_correction = torch.tensor((action_high - action_low) / 2, dtype = torch.float32).to(self.device)
-
-        # clamping region, values taken from paper
-        self.clamp_log_min = -20  # -5 also used
-        self.clamp_log_max = 2
-
+                         output_size = action_size, 
+                         layer_sizes = layer_sizes,
+                         optim_eps = eps)
         
     def forward(self, obs):
-        # output is probability distribution
-        # log_std depends on the state, unlike in PPO
-        mean, log_std = super().forward(obs)
+        # output is list of logits
+        action_logits_list = super().forward(obs)
 
-        # we clamp the std (reason: we do not want an arbitrary large std)
-        #   the original SAC paper clamps in the range of [-20, 2]
-        log_std = torch.clamp(log_std, min = self.clamp_log_min, max = self.clamp_log_max)
-        # log_std = torch.tanh(log_std)
-        # LOG_MIN = -5
-        # LOG_MAX = 2
-        # log_std = LOG_MIN + 0.5 * (LOG_MAX - LOG_MIN) * (log_std + 1)
+        return action_logits_list
 
-        # convert from log_std to normal std
-        std = log_std.exp()
+    def action_distr_sample(self, obs):
+        action_logits_list = self.forward(obs)
 
-        return mean, std
-    
-    def scale_action(self, action):
-        """
-        Rescale the action from [low, high] to [-1, 1]
-        (no need for symmetric action space)
-        """
-        return 2 * ((action - self.action_low) / (self.action_high - self.action_low)) - 1
+        actions = []
+        log_probs = []
+        action_probs = []
 
-    def unscale_action(self, scaled_action):
-        """
-        Rescale the action from [-1, 1] to [low, high]
-        (no need for symmetric action space)
+        for logits in action_logits_list:
+            prob_distr = torch.distributions.OneHotCategorical(logits = logits)
 
-        :param scaled_action: Action to un-scale
-        """
-        return self.action_low + (0.5 * (scaled_action + 1.0) * (self.action_high - self.action_low))
+            action = prob_distr.sample()
 
-    def action_distr_sample(self, obs, reparameterize = True, deterministic = False):
-        mean, std = self.forward(obs)
-        
-        # get prob distribution
-        prob_distr = torch.distributions.Normal(mean, std)
+            action_prob = prob_distr.probs
 
-        # if we need to evaluate the policy
-        if deterministic:
-            sample = mean
-        # add noise to values (reparameterize trick; exploration)
-        #   (mean + std * N(0, I))
-        elif reparameterize:
-            sample = prob_distr.rsample()
-        # no noise
-        else:
-            sample = prob_distr.sample()
+            # avoid instability
+            z = (action_prob == 0.0).float() * 1e-8
+            log_prob = torch.log(action_prob + z)
 
-        # tanh of action sample
-        tanh_action = torch.tanh(sample) 
+            # add to lists
+            actions.append(action)
+            log_probs.append(log_prob)
+            action_probs.append(action_prob)
 
-        # log of the prob_distr function evaluated at sample value
-        log_prob = prob_distr.log_prob(sample)
-        log_prob = log_prob.sum(axis = -1)
-        # correct change in prob density due to tanh 
-        #   (function = magic, taken from openAI spinning up)
-        log_prob -= (2 * (np.log(2) - sample - functional.softplus(-2 * sample))).sum(axis = 1)
-        # other function from stable baselines
-        # log_prob -= torch.log(self.std_correction * (1 - tanh_action.pow(2)) + 1e-6)
-        # log_prob = log_prob.sum(dim = 1, keepdim = True)
+        return actions, log_probs, action_probs
 
-        # final action
-        #   constrain action within [-1, 1] with tanh,
-        #   unscale for regular action range.
-        action = self.unscale_action(tanh_action)
-        action = action.to(self.device) # should be on device
+# act = MultiDiscreteActor(0.0003, 4, [3,3,3])
 
-        return action, log_prob
-    
-    
+# input = torch.tensor([0.5, 0.5, 0.5, 0.5])
+
+# print(act.forward(input))
