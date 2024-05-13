@@ -2,6 +2,7 @@ import os
 import sys
 
 import numpy as np
+import pandas as pd
 
 import torch
 import torch.nn as nn
@@ -9,8 +10,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 # temporary needed
-# from custom_agents.utils.citylearn_wrapper import CityLearnWrapper
-# from custom_reward.custom_reward import CustomReward
+from custom_agents.utils.citylearn_wrapper import CityLearnWrapper
+from custom_reward.custom_reward import CustomReward
 
 from citylearn.citylearn import CityLearnEnv
 from citylearn.wrappers import NormalizedSpaceWrapper
@@ -74,11 +75,11 @@ class Agents:
         
         # for now done like this: check if citylearn env with custom reward function for 
         #   additional logging
-        # self.citylearn = isinstance(self.env.reward_function, CustomReward) \
-        #                     if (isinstance(self.env, CityLearnWrapper) \
-        #                     or isinstance(self.env, CityLearnEnv) \
-        #                     or isinstance(self.env, NormalizedSpaceWrapper)) \
-        #                     else False
+        self.citylearn = isinstance(self.env.reward_function, CustomReward) \
+                            if (isinstance(self.env, CityLearnWrapper) \
+                            or isinstance(self.env, CityLearnEnv) \
+                            or isinstance(self.env, NormalizedSpaceWrapper)) \
+                            else False
 
         # initialize replay buffer
         obs_size_list = [obs.shape for obs in self.env.observation_space]
@@ -522,8 +523,8 @@ class Agents:
                 self.logger.log(self.rollout_log, step, "rollout")
                 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
-                # if self.citylearn:
-                #     self.logger.log_custom_reward_values(step)
+                if self.citylearn:
+                    self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
                 if (ep % 50 == 0):
