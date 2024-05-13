@@ -104,6 +104,9 @@ class SpiderFlyEnvMA(ParallelEnv):
     @functools.lru_cache(maxsize=None)
     def action_space(self, agent):
         return self.action_spaces[agent]
+    
+    def _euclidean_dist(self, loc1, loc2):
+        return np.sqrt(np.sqaure(loc1[0] - loc2[0]) + np.square(loc1[1] - loc2[1]))
 
     def _get_obs(self):
         # append flattens by itself
@@ -249,7 +252,7 @@ class SpiderFlyEnvMA(ParallelEnv):
             sides = [tuple(side) for side in [self._action_to_direction[action] + fly_loc for action in [1, 2, 3, 4]]]
             # check in grid array if spiders are on these possible possitions
             count = 0
-            spider_rew = np.repeat(-2, self.nr_spiders)
+            spider_rew = np.repeat(0, self.nr_spiders)
             for side in sides:
                 # collides with wall
                 if any((coord < 0 or coord >= self.size) for coord in side):
@@ -259,12 +262,17 @@ class SpiderFlyEnvMA(ParallelEnv):
                     count += 1
                     for (spider_idx, loc) in enumerate(self._spider_locations):
                         if tuple(loc) == side:
-                            spider_rew[spider_idx] = 1
+                            spider_rew[spider_idx] += 2
             # if all sides are occupied
             if count == 4 or sum(spider_rew) == self.nr_spiders:
                 flies_caught[fly_idx] = True
                 # remove fly and spawn somewhere else
                 self.move_fly_random_loc(fly_idx)
+
+            # add eucledian distance to rewards
+            # NOTE: BROKEN FOR > 1 FLY, HAVE TO FIND FAST SOLUTION FOR MORE FLIES
+            for idx in range(len(spider_rew)):
+                spider_rew[idx] -= self._euclidean_dist(self._spider_locations[idx], self._fly_locations[0])
         
         return flies_caught, spider_rew
 
