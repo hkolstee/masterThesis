@@ -8,9 +8,9 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
-from custom_agent.SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
-from custom_agent.SAC_components.critic_discrete import Critic
-from custom_agent.SAC_components.logger import Logger
+from custom_agents.replay_buffers.ma_replay_buffer import MultiAgentReplayBuffer
+from custom_agents.networks.critic_discrete import Critic
+from custom_agents.utils.logger import Logger
 
 from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
 from custom_spider_env.spider_fly_env.envs.pettingzoo_wrapper import PettingZooWrapper
@@ -73,7 +73,6 @@ class seqDQN:
         #   size is the obs size, all agent actions except for the last in sequence and the one hot id vector.
         # Agent homogeneuosity is assumed for equal observation/action size.
         self.DQN_input_size = obs_size_global + (self.nr_agents - 1) * env.action_space[0].n + self.agent_ids.shape[0]
-        # print(env.observation_space[0].shape[0], (self.nr_agents - 1), env.action_space[0].n, self.agent_ids.shape[0], self.DQN_input_size)
         self.shared_DQN = Critic(lr, self.DQN_input_size, env.action_space[0].n, layer_sizes)
         self.shared_target_DQN = deepcopy(self.shared_DQN)
 

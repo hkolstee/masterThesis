@@ -8,9 +8,9 @@ import torch
 import torch.optim as optim
 import torch.nn.functional as F
 
-from custom_agent.SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
-from custom_agent.SAC_components.critic_discrete import Critic
-from custom_agent.SAC_components.logger import Logger
+from custom_agents.replay_buffers.ma_replay_buffer import MultiAgentReplayBuffer
+from custom_agents.networks.critic_discrete import Critic
+from custom_agents.utils.logger import Logger
 
 from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
 from custom_spider_env.spider_fly_env.envs.pettingzoo_wrapper import PettingZooWrapper

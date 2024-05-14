@@ -292,6 +292,7 @@ class SAC:
         """
         # reset env
         obs, info = self.env.reset()
+        obs = obs[0]
 
         # episode and epsiode len count
         ep = 0
@@ -328,7 +329,7 @@ class SAC:
             # NOTE: FOR NOW WE TAKE THE GLOBAL OBS, REWARD MEANS, BECAUSE THE EXPERIMENTAL ENV 
             # IS MULTIAGENT, WITH GLOBAL OBS FOR EACH AGENT, SHOULD BE CHANGED FOR MULTIDISCRETE 
             # SINGLE AGENT ENVS. 
-            self.replay_buffer.add_transition(obs[0], actions, np.mean(reward), next_obs[0], done[0])
+            self.replay_buffer.add_transition(obs, actions, np.mean(reward), next_obs[0], done[0])
 
             # observation update
             obs = next_obs[0]

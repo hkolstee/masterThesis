@@ -8,7 +8,7 @@ import torch
 import torch.nn.functional as F
 
 from custom_agents.replay_buffers.ma_replay_buffer import MultiAgentReplayBuffer
-from custom_agents.networks.critic_discrete import Critic
+from custom_agents.networks.critic_multidiscrete import MultiDiscreteCritic
 from custom_agents.utils.logger import Logger
 
 from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
@@ -36,6 +36,9 @@ class IndependentDQN:
         self.batch_size = batch_size
         self.buffer_max_size = buffer_max_size
 
+        # init logger
+        self.logger = Logger(self.env, log_dir)
+
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -51,9 +54,10 @@ class IndependentDQN:
         # create batched size tensor to cat to input
         self.agent_id_tensors = [self.agent_ids[agent_idx].unsqueeze(0).expand(batch_size, -1) for agent_idx in range(self.nr_agents)]
 
-        # Q networks share parameters among agents, with additional one_hot id as input
-        self.shared_DQN = Critic(lr, env.observation_space[0].shape[0] + self.agent_ids.shape[0], env.action_space[0].n, layer_sizes)
-        self.shared_target_DQN = Critic(lr, env.observation_space[0].shape[0] + self.agent_ids.shape[0], env.action_space[0].n, layer_sizes)
+        # Q networks output multiple discrete actions per forward pass
+        action_sizes = [act_space.n for act_space in env.action_space]
+        self.shared_DQN = MultiDiscreteCritic(lr, env.observation_space[0].shape[0], action_sizes, layer_sizes)
+        self.shared_target_DQN = MultiDiscreteCritic(lr, env.observation_space[0].shape[0], action_sizes, layer_sizes)
         # copy parameters
         self.shared_target_DQN.load_state_dict(self.shared_DQN.state_dict())
 
@@ -129,6 +133,7 @@ class IndependentDQN:
 
         for eps in range(num_episodes):
             obs, _ = self.env.reset()
+            obs = obs[0]
             terminals = [False]
             truncations = [False]
             rew_sum = np.zeros(self.nr_agents)
@@ -137,9 +142,7 @@ class IndependentDQN:
             learn_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
-                actions = []
-                for agent_idx in range(self.nr_agents):
-                    actions.append(self.get_action(obs[agent_idx], agent_idx))
+                actions = self.get_action(obs)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
@@ -161,13 +164,11 @@ class IndependentDQN:
                         target_state_dict[params] = policy_state_dict[params] * self.tau + target_state_dict[params] * (1 - self.tau)
                     self.shared_target_DQN.load_state_dict(target_state_dict)
 
-                    
-
                 # add to reward sum
                 rew_sum = np.add(rew_sum, rewards)
 
                 # update state
-                obs = next_obs
+                obs = next_obs[0]
 
                 # keep track of steps
                 if self.global_steps < self.eps_steps:
