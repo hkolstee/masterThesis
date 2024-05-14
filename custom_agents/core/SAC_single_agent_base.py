@@ -294,7 +294,7 @@ class SoftActorCriticCore(RLbase):
                     self.logger.log(logs, step, group = "train")
                 # log reward seperately
                 reward_log = {"reward_sum": ep_rew_sum}
-                self.logger.log(reward_log, step, "Reward")
+                self.logger.log(reward_log, step, "reward")
 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
                 # if self.citylearn:

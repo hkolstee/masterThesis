@@ -14,7 +14,7 @@ from custom_agents.utils.logger import Logger
 from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
 from custom_spider_env.spider_fly_env.envs.pettingzoo_wrapper import PettingZooWrapper
 
-class IndependentDQN:
+class SharedDQN:
     def __init__(self, env, 
                  lr = 1e-3, 
                  gamma = 0.99, 
