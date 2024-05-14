@@ -298,10 +298,7 @@ class seqDQN:
                 # move sequential index for the next action
                 seq_action_index += current_action.shape[0]
             
-            # print("last action sampled: ", actions[-1])
-        
         return actions
-
 
     def train(self, num_episodes):
         reward_log = []

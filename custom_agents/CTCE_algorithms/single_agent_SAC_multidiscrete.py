@@ -90,7 +90,9 @@ class SAC:
 
         # entropy target
         # self._entropy_targ = -0.98 * torch.log(1 / torch.tensor(self.env.action_space.n))
-        self.entropy_targ = -env.action_space[0].n
+        self.entropy_targs = []
+        for act_space in env.action_space:
+            self.entropy_targs.append(-act_space.n)
     
     def save_networks_parameters(self, save_dir, step):
         self.actor.save(save_dir, "actor" + "_" + str(step))
@@ -146,9 +148,9 @@ class SAC:
         # gather Q-values for chosen action
         q1_chosen_actions = []
         q2_chosen_actions = []
-        for (q1vals, q2vals, action) in zip(q1_buffer, q2_buffer, replay_act):
-            q1_chosen_actions.append(q1vals.gather(1, action.long().unsqueeze(1)).squeeze())
-            q2_chosen_actions.append(q2vals.gather(1, action.long().unsqueeze(1)).squeeze())
+        for idx, (q1vals, q2vals) in enumerate(zip(q1_buffer, q2_buffer)):
+            q1_chosen_actions.append(q1vals.gather(1, replay_act[:,idx].long().unsqueeze(1)).squeeze())
+            q2_chosen_actions.append(q2vals.gather(1, replay_act[:,idx].long().unsqueeze(1)).squeeze())
 
         # For the RHS of the loss function (Approximation of Bellman equation with (1 - d) factor):
         with torch.no_grad():
@@ -166,26 +168,22 @@ class SAC:
 
             # Action probabilities can be used to estimate the expectation (cleanRL)
             q_targs = []
-            print(len(q_target_vals))
-            print(len(self.log_alphas))
-            print(len(probs))
-            print(len(log_probs))
             for idx in range(self.nr_actions):
                 q_targs.append((probs[idx] * (q_target_vals[idx] - self.log_alphas[idx].unsqueeze(1) * log_probs[idx])).sum(dim = 1))
-            
-            print(q_targs)
                 
             # Bellman approximation
-            bellman = rewards + self.gamma * (1 - dones) * torch.mean(torch.stack(q_targs))
+            bellman = []
+            for idx in range(self.nr_actions):
+                bellman.append(rewards + self.gamma * (1 - dones) * q_targs[idx])
 
-        
-        for (b, q1, q2) in zip(bellman, q1_buffer, q2_buffer):
+        losses = []
+        for (b, q1, q2) in zip(bellman, q1_chosen_actions, q2_chosen_actions):
             # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
-            loss_critic1 = F.mse_loss(q1_buffer, bellman)
-            loss_critic2 = F.mse_loss(q2_buffer, bellman)
-            loss_critic = loss_critic1 + loss_critic2 
+            loss_critic1 = F.mse_loss(q1, b)
+            loss_critic2 = F.mse_loss(q2, b)
+            losses.append(loss_critic1 + loss_critic2) 
 
-        return loss_critic
+        return sum(losses)
     
     def actor_and_alpha_loss(self, obs):
         """
@@ -199,13 +197,17 @@ class SAC:
         q2_policy = self.critic2.forward(obs)
         # take min of these two 
         #   = clipped Q-value for stable learning, reduces overestimation
-        q_policy = torch.minimum(q1_policy, q2_policy)
+        q_policy = []
+        for q1, q2 in zip(q1_policy, q2_policy):
+            q_policy.append(torch.minimum(q1, q2))
         # entropy regularized loss
-        loss_policy = (probs * (self.alpha.unsqueeze(1) * log_probs - q_policy)).sum(1).mean()
+        loss_policy = []
+        loss_alpha = []
+        for idx in range(self.nr_actions):
+            loss_policy.append((probs[idx] * (self.alphas[idx].unsqueeze(1) * log_probs[idx] - q_policy[idx])).sum(1).mean())
+            loss_alpha.append((probs[idx].detach() * (-self.log_alphas[idx].exp() * (log_probs[idx].detach() + self.entropy_targs[idx]))).mean())
 
-        loss_alpha = (probs.detach() * (-self.log_alpha.exp() * (log_probs.detach() + self.entropy_targ))).mean()
-
-        return loss_policy, loss_alpha
+        return sum(loss_policy), loss_alpha
 
     def learn(self):
         """
@@ -250,9 +252,10 @@ class SAC:
         self.unfreeze_network_grads(self.critic2)
 
         # backward prop + gradient step
-        self.alpha_optimizer.zero_grad()
-        loss_alpha.backward()
-        self.alpha_optimizer.step()   
+        for idx, loss in enumerate(loss_alpha):
+            self.alpha_optimizers[idx].zero_grad()
+            loss.backward()
+            self.alpha_optimizers[idx].step()   
 
         # polyak update of target networks
         self.polyak_update(self.critic1, self.critic1_targ, self.polyak)
@@ -261,21 +264,20 @@ class SAC:
         return 1, \
                loss_policy.cpu().detach().numpy(), \
                loss_critic.cpu().detach().numpy(), \
-               self.alpha.cpu().detach().numpy()[0], \
-               loss_alpha.cpu().detach().numpy()
+               [a.cpu().detach().numpy()[0] for a in self.alphas], \
+               [l.cpu().detach().numpy() for l in loss_alpha]
     
     def get_action(self, obs):
         # make tensor and send to device
         if not isinstance(obs, torch.Tensor):
-            obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+            obs = torch.tensor(np.array(obs), dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
-            action, _, _ = self.actor.action_distr_sample(obs)
+            actions, _, _ = self.actor.action_distr_sample(obs)
+        
+        return [np.argmax(tensor.cpu().detach().numpy()[0]) for tensor in actions]
 
-        return np.argmax(action.cpu().detach().numpy()[0])
-
-    
     def train(self, 
               nr_steps, 
               max_episode_len = -1, 
@@ -297,19 +299,18 @@ class SAC:
         # steps learned per episode count (for avg)
         ep_learn_steps = 0
         # sum of log values for each ep
-        ep_rew_sum = 0
+        ep_rew_sum = np.zeros(self.nr_actions)
         ep_aloss_sum = 0
         ep_closs_sum = 0
-        ep_alpha_sum = 0
-        ep_alphaloss_sum = 0
-        ep_aeloss_sum = 0
+        ep_alpha_sum = np.zeros(self.nr_actions)
+        ep_alphaloss_sum = np.zeros(self.nr_actions)
         
         for step in range(nr_steps):
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 actions = [act_space.sample() for act_space in self.env.action_space]
             else: 
-                actions = self.get_action(obs[0])
+                actions = self.get_action(obs)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(actions)
@@ -317,7 +318,7 @@ class SAC:
             # step increment 
             ep_steps += 1
             # reward addition to total sum
-            ep_rew_sum += np.mean(reward)
+            ep_rew_sum += reward
 
             # set done to false if signal is because of time horizon (spinning up)
             if ep_steps == max_episode_len:
@@ -333,7 +334,7 @@ class SAC:
             obs = next_obs[0]
 
             # done or max steps
-            if (done or truncated or ep_steps == max_episode_len):
+            if (done[0] or truncated[0] or ep_steps == max_episode_len):
                 ep += 1
 
                 # avg losses and entropy
@@ -342,12 +343,10 @@ class SAC:
                     avg_critic_loss = ep_closs_sum / ep_learn_steps
                     avg_alpha = ep_alpha_sum / ep_learn_steps
                     avg_alpha_loss = ep_alphaloss_sum / ep_learn_steps
-                    avg_ae_loss = ep_aeloss_sum / ep_steps
                     # save training logs: 
                     logs = {"avg_actor_loss": avg_actor_loss,
                             "avg_critic_loss": avg_critic_loss,
                             "avg_alpha_loss": avg_alpha_loss,
-                            "avg_ae_loss": avg_ae_loss,
                             "avg_alpha": avg_alpha}
                     self.logger.log(logs, step, group = "train")
                 # log reward seperately
@@ -359,24 +358,24 @@ class SAC:
                 #     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                if (ep % 50 == 0):
-                    print("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
+                # if (ep % 1000 == 0):
+                #     print("[Episode {:d} total reward: {:0.3f}] ~ ".format(ep, ep_rew_sum))
                     # print(obs)
                     # print(latent_obs)
                     # print(decoded_obs)
                 
                 # reset
                 obs, info = self.env.reset()
+                obs = obs[0]
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
 
-                ep_rew_sum = 0
+                ep_rew_sum = np.zeros(self.nr_actions)
                 ep_aloss_sum = 0
                 ep_closs_sum = 0
-                ep_alpha_sum = 0
-                ep_alphaloss_sum = 0
-                ep_aeloss_sum = 0
+                ep_alpha_sum = np.zeros(self.nr_actions)
+                ep_alphaloss_sum = np.zeros(self.nr_actions)
 
             # learn
             if step > learn_delay and step % learn_freq == 0:
