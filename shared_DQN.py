@@ -22,7 +22,7 @@ class SharedDQN:
                  eps_end = 0.05, 
                  eps_steps = 1000, 
                  tau = 0.005, 
-                 batch_size = 8, 
+                 batch_size = 256, 
                  buffer_max_size = 10000, 
                  log_dir = "tensorboard_logs",
                  layer_sizes = (256, 256)):

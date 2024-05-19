@@ -27,9 +27,11 @@ class seqDQN:
                  tau = 0.005, 
                  batch_size = 256, 
                  buffer_max_size = 10000, 
-                 log_dir = "tensorboard_logs",
                  layer_sizes = (256, 256),
-                 global_observations = False):
+                 global_observations = False,
+                 log_dir = "tensorboard_logs",
+                 save_dir = "models",
+                 ):
         self.env = env
         self.lr = lr
         self.gamma = gamma
@@ -40,6 +42,7 @@ class seqDQN:
         self.batch_size = batch_size
         self.buffer_max_size = buffer_max_size
         self.global_observations = global_observations
+        self.save_dir = save_dir
 
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -86,14 +89,23 @@ class seqDQN:
         act_size_list = [(1,) for _ in env.action_space]
         self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_size_list, act_size_list, batch_size)
 
+    def polyak_update(self, base_network, target_network, polyak):
+        """ 
+        Polyak/soft update of target networks.
+        """
+        with torch.no_grad():
+            for (base_params, target_params) in zip(base_network.parameters(), target_network.parameters()):
+                target_params.data *= polyak
+                target_params.data += ((1 - polyak) * base_params.data)
+
     def learn(self):
         # buffer not full enough
         if self.replay_buffer.buffer_index < self.batch_size:
             # return status 0
-            return 0, None
+            return 0, None, None, None
         
         # logging list for return of the function
-        loss_Q_list = []
+        loss_list = []
         Q_list = []
         Q_target_list = []
 
@@ -130,8 +142,6 @@ class seqDQN:
             # one_hot id (of current agent)
             input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
-        # print("TRAINING STEP --------------")
-
         with torch.autograd.set_detect_anomaly(True):
             for agent_idx in range(self.nr_agents):
                 # we can use last used tensor in target Q as current Q input
@@ -139,20 +149,8 @@ class seqDQN:
                     # last target Q input is same as next normal Q input (even onehot id)
                     input_tensor = targ_input_tensor.clone().detach()
 
-                # Q_i(s, a_1, ..., a_i)
-                # print("---------------")
-                # print("input tensor agent ", agent_idx)
-                # print(input_tensor)
                 Q_vals = self.shared_DQN(input_tensor)
-                # print("Qvals")
-                # print(Q_vals)
-                # print("taken action")
-                # print(replay_act[agent_idx].long())
-                # Q_taken_action = self.shared_DQN(input_tensor).gather(1, replay_act[agent_idx].long())
                 Q_taken_action = Q_vals.gather(1, replay_act[agent_idx].long())
-                # print("Taken Q_val")
-                # print(Q_taken_action)
-                # print("-----------------")
 
                 # TARGET Q values
                 with torch.no_grad():
@@ -173,15 +171,8 @@ class seqDQN:
                         targ_input_tensor[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
 
                         # max_a_i+1 Q*_i+1(s, a_1, ..., a_i+1)
-                        # print("target input tensor")
-                        # print(targ_input_tensor)
                         Q_vals = self.shared_target_DQN(targ_input_tensor)
-                        # print("target Q vals")
-                        # print(Q_vals)
-                        # print("Max target Q vals")
                         max_Q_next_agent = Q_vals.max(1).values
-                        # print(max_Q_next_agent)
-                        # Q_next_agent = self.shared_target_DQN(targ_input_tensor).max(1).values
 
                         # we learn from the next agent Qvals only, with diminished learning rate
                         Q_target = max_Q_next_agent
@@ -196,21 +187,10 @@ class seqDQN:
                         # one_hot id (of first agent !!)
                         targ_input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
-                        # print("last target input tensor")
-                        # print(targ_input_tensor)
                         Q_vals = self.shared_target_DQN(targ_input_tensor)
-                        # print("last target Q vals")
-                        # print(Q_vals)
-                        # print("Max target Q vals")
                         max_Q_next_obs = Q_vals.max(1).values
-                        # print(max_Q_next_agent)
-
-                        # max_a' Q*_1(s', a')
-                        # Q_next_obs = self.shared_target_DQN(targ_input_tensor).max(1).values
 
                         # normal temporal difference target
-                        # Q_target = rewards + self.gamma * Q_next_obs
-                        # print("rewards, dones, gamma", rewards, dones[agent_idx], self.gamma)
                         Q_target = rewards + (1 - dones[agent_idx]) * self.gamma * max_Q_next_obs
                 
                 # loss
@@ -223,27 +203,19 @@ class seqDQN:
                 # self.optimizers[agent_idx].step()
 
                 # log losses
-                loss_Q_list.append(loss.detach().item())
+                loss_list.append(loss.detach().item())
                 Q_list.append(torch.mean(Q_taken_action).detach().item())
                 Q_target_list.append(torch.mean(Q_target).detach().item())
 
-            # log Q values
-            Q_logs = {"Q": Q_list,
-                      "Q_target": Q_target_list}
-            self.logger.log(Q_logs, self.global_steps, "values")
-
         # return status 1
-        return 1, loss_Q_list
-
+        return 1, loss_list, Q_list, Q_target_list
 
     def get_actions(self, observations, deterministic = False):
-        # print("GET ACTIONS -------")
         # action list
         actions = []
 
         # get epsilon
-        current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps, 0)) / self.eps_steps)
-        self.logger.log({"epsilon": current_eps}, self.global_steps, "train")
+        self.current_eps = self.eps_end + (self.eps_start - self.eps_end) * (np.max((self.eps_steps - self.global_steps, 0)) / self.eps_steps)
 
         with torch.no_grad():
             # make tensor if needed
@@ -272,7 +244,7 @@ class seqDQN:
         
         for agent_idx in range(self.nr_agents):
             # epsilon non-greedy
-            if np.random.uniform(0, 1) < current_eps and not deterministic:
+            if np.random.uniform(0, 1) < self.current_eps and not deterministic:
                 # add to actions
                 actions.append(self.env.action_space[agent_idx].sample())
             # epsilon greedy
@@ -282,12 +254,8 @@ class seqDQN:
                     input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
 
                     # forward through DQN, take argmax for max action
-                    # print("Input Tensor agent ", agent_idx)
-                    # print(input_tensor.unsqueeze(0))    
-                    # out = self.shared_DQN(input_tensor.unsqueeze(0))
                     actions.append(self.shared_DQN(input_tensor.unsqueeze(0)).argmax().item())
 
-            # print("action: ", actions[-1])
             # for all agents except the last we add the action to the input of the next
             if agent_idx < (self.nr_agents - 1):
                 # add selected action to tensor but first convert to onehot
@@ -300,8 +268,7 @@ class seqDQN:
         return actions
 
     def train(self, num_episodes):
-        reward_log = []
-        loss_log = []
+        current_best = 0
 
         for eps in range(num_episodes):
             obs, _ = self.env.reset()
@@ -309,6 +276,8 @@ class seqDQN:
             truncations = [False]
             rew_sum = np.zeros(self.nr_agents)
             loss_sum = np.zeros(self.nr_agents)
+            Q_sum = np.zeros(self.nr_agents)
+            Q_target_sum = np.zeros(self.nr_agents)
 
             learn_steps = 0
             ep_steps = 0
@@ -323,7 +292,7 @@ class seqDQN:
                 self.replay_buffer.add_transition(obs, actions, rewards, next_obs, terminals)
 
                 # learning step
-                status, losses = self.learn()
+                status, losses, Qs, Q_targets = self.learn()
 
                 # update state
                 obs = next_obs
@@ -333,34 +302,42 @@ class seqDQN:
                     learn_steps += 1
                     # add to loss sum
                     np.add(loss_sum, losses, out = loss_sum)
+                    np.add(Q_sum, Qs, out = Q_sum)
+                    np.add(Q_target_sum, Q_targets, out = Q_target_sum)
 
                     # soft update / polyak update
-                    target_state_dict = self.shared_target_DQN.state_dict()
-                    policy_state_dict = self.shared_DQN.state_dict()
-                    for params in policy_state_dict:
-                        target_state_dict[params] = policy_state_dict[params] * self.tau + target_state_dict[params] * (1 - self.tau)
-                    self.shared_target_DQN.load_state_dict(target_state_dict)
+                    self.polyak_update(self.shared_DQN, self.shared_target_DQN, 1 - self.tau)
 
                 # add to reward sum
                 rew_sum = np.add(rew_sum, rewards)
 
                 # keep track of steps
-                self.global_steps += 1
+                if self.global_steps < self.eps_steps:
+                    self.global_steps += 1
                 ep_steps += 1
 
-            # log
-            avg_loss = loss_sum / learn_steps
-            reward_log.append(rew_sum)
-            loss_log.append(loss_sum / learn_steps)
-            # tensorboard
+            # save if best
+            current_rew = np.mean(rew_sum)
+            if current_rew > current_best:
+                current_best = current_rew
+                self.shared_DQN.save_checkpoint(self.save_dir, "seqDQN", losses, eps)
+                self.shared_target_DQN.save_checkpoint(self.save_dir, "target_seqDQN", losses, eps)
+
+            # tensorboard logs
+            if learn_steps:
+                avg_loss = loss_sum / learn_steps
+                avg_Q = Q_sum / learn_steps
+                avg_target_Q = Q_target_sum / learn_steps
+                self.logger.log({"average_loss": avg_loss,
+                                 "avg_Q_value": avg_Q,
+                                 "avg_Q_target_value": avg_target_Q,
+                                 "epsilon": self.current_eps}, eps, group = "train")
+            else:
+                avg_loss = None
             rollout_log = {"reward_sum": rew_sum,
                            "ep_len": ep_steps}
-            self.logger.log(rollout_log, self.global_steps, group = "rollout")
-            if learn_steps > 0:
-                logs = {"average_loss": avg_loss}
-                self.logger.log(logs, self.global_steps, group = "train")
+            self.logger.log(rollout_log, eps, group = "rollout")
 
+            # command line info print
             if eps % (num_episodes // 20) == 0:
-                print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", loss_log[-1])
-
-        return reward_log, loss_log
+                print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", avg_loss)
