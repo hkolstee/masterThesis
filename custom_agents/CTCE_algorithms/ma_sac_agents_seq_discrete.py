@@ -447,6 +447,8 @@ class Agents:
             learn_freq (int, optional): The frequency in steps that the agent undergoes one learning iteration. Defaults to 50.
             learn_weight (int, optional): The amount of gradient descent steps per learning iteration. Defaults to 50.
         """
+        current_best = 0
+
         # reset env
         obs, _ = self.env.reset()
 
@@ -504,21 +506,30 @@ class Agents:
                                  "avg_alpha_loss": avg_alpha_loss,
                                  "avg_alpha": avg_alpha,
                                  "avg_policy_entr": avg_policy_entr}
-                    self.logger.log(self.logs, step, group = "train")
+                    self.logger.log(self.logs, ep, group = "train")
                 # log reward seperately
                 self.rollout_log = {"reward_sum": ep_rew_sum,
                                     "ep_steps": ep_steps}
-                self.logger.log(self.rollout_log, step, "rollout")
+                self.logger.log(self.rollout_log, ep, "rollout")
                 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
                 # if self.citylearn:
                 #     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                if (ep % 50 == 0):
+                if step % (nr_steps // 20) == 0:
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                     # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
+                            # checkpoint
+                if np.mean(ep_rew_sum) > current_best:
+                    current_best = np.mean(ep_rew_sum)
+                    self.actor.save(save_dir, "actor" + "_" + str(step))
+                    self.critic1.save(save_dir, "critic1" + "_" + str(step))
+                    self.critic2.save(save_dir, "critic2" + "_" + str(step))
+                    self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
+                    self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
+
                 # reset
                 obs, _ = self.env.reset()
                 # reset logging info
@@ -546,14 +557,6 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-
-            # checkpoint
-            if (step % checkpoint == 0):
-                self.actor.save(save_dir, "actor" + "_" + str(step))
-                self.critic1.save(save_dir, "critic1" + "_" + str(step))
-                self.critic2.save(save_dir, "critic2" + "_" + str(step))
-                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
 
             # finally, step increment
             ep_steps += 1

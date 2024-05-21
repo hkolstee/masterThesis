@@ -270,7 +270,7 @@ class SAC:
     def get_action(self, obs):
         # make tensor and send to device
         if not isinstance(obs, torch.Tensor):
-            obs = torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device)
+            obs = torch.tensor(np.array(obs), dtype = torch.float32).unsqueeze(0).to(self.device)
 
         # get actor action
         with torch.no_grad():
@@ -292,6 +292,7 @@ class SAC:
         """
         # reset env
         obs, info = self.env.reset()
+        obs = obs[0]
 
         # episode and epsiode len count
         ep = 0
@@ -310,7 +311,7 @@ class SAC:
             if step < warmup_steps:
                 actions = [act_space.sample() for act_space in self.env.action_space]
             else: 
-                actions = self.get_action(obs[0])
+                actions = self.get_action(obs)
 
             # transition
             next_obs, reward, done, truncated, info = self.env.step(actions)
@@ -328,7 +329,7 @@ class SAC:
             # NOTE: FOR NOW WE TAKE THE GLOBAL OBS, REWARD MEANS, BECAUSE THE EXPERIMENTAL ENV 
             # IS MULTIAGENT, WITH GLOBAL OBS FOR EACH AGENT, SHOULD BE CHANGED FOR MULTIDISCRETE 
             # SINGLE AGENT ENVS. 
-            self.replay_buffer.add_transition(obs[0], actions, np.mean(reward), next_obs[0], done[0])
+            self.replay_buffer.add_transition(obs, actions, np.mean(reward), next_obs[0], done[0])
 
             # observation update
             obs = next_obs[0]
@@ -366,6 +367,7 @@ class SAC:
                 
                 # reset
                 obs, info = self.env.reset()
+                obs = obs[0]
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0

@@ -43,6 +43,7 @@ class SoftActorCriticCore(RLbase):
                  use_AE = False,
                  AE_reduc_scale = 6,
                  log_dir = "tensorboard_logs",
+                 global_obs = False
                  ):
         self.env = env
         self.gamma = gamma
@@ -50,6 +51,8 @@ class SoftActorCriticCore(RLbase):
         self.batch_size = batch_size
         # use of autoencoder
         self.use_AE = use_AE
+        # if env provides global obs to each agent or not
+        self.global_obs = global_obs
         
         # initialize tensorboard logger
         self.logger = Logger(env, log_dir)
@@ -294,7 +297,7 @@ class SoftActorCriticCore(RLbase):
                     self.logger.log(logs, step, group = "train")
                 # log reward seperately
                 reward_log = {"reward_sum": ep_rew_sum}
-                self.logger.log(reward_log, step, "Reward")
+                self.logger.log(reward_log, step, "reward")
 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
                 # if self.citylearn:
