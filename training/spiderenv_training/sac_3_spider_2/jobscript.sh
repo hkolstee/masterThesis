@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --time=36:00:00
+#SBATCH --time=68:00:00
 #SBATCH --job-name=multi-agent-custom-seq-sac
 #SBATCH --partition=gpu
 #SBATCH --gpus-per-node=1

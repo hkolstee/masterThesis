@@ -89,3 +89,45 @@ The following have been reloaded with a version change:
   logger.warn(f"Overriding environment {new_spec.id} already in registry.")
 /home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/envs/registration.py:694: UserWarning: [33mWARN: Overriding environment SpiderFlyGridMA-v0 already in registry.[0m
   logger.warn(f"Overriding environment {new_spec.id} already in registry.")
+/var/spool/slurmd/job9085513/slurm_script: line 20: 3730898 Killed                  python3 train.py
+slurmstepd: error: Detected 1 oom_kill event in StepId=9085513.batch. Some of the step tasks have been OOM Killed.
+
+###############################################################################
+Hábrók Cluster
+Job 9085513 for user s3515249
+Finished at: Mon May 20 23:16:50 CEST 2024
+
+Job details:
+============
+
+Job ID              : 9085513
+Name                : multi-agent-custom-seq-sac
+User                : s3515249
+Partition           : gpulong
+Nodes               : v100gpu2
+Number of Nodes     : 1
+Cores               : 1
+Number of Tasks     : 1
+State               : RUNNING
+Submit              : 2024-05-20T11:15:05
+Start               : 2024-05-20T11:17:16
+End                 : --
+Reserved walltime   : 1-12:00:00
+Used walltime       :   11:59:34
+Used CPU time       : --
+% User (Computation): --
+% System (I/O)      : --
+Mem reserved        : 8000M
+Max Mem (Node/step) : 0.00  (Node unknown, N/A)
+Full Max Mem usage  : 0.00  (Until last completed step)
+Total Disk Read     : 0.00  (Until last completed step)
+Total Disk Write    : 0.00  (Until last completed step)
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################
