@@ -458,12 +458,12 @@ class Agents:
         # steps learned per episode count (for avg)
         ep_learn_steps = 0
         # sum of log values for each ep
-        ep_rew_sum = np.zeros(self.nr_agents)
-        ep_aloss_sum = np.zeros(self.nr_agents)
-        ep_closs_sum = np.zeros(self.nr_agents)
-        ep_alpha_sum = np.zeros(self.nr_agents)
-        ep_alphaloss_sum = np.zeros(self.nr_agents)
-        ep_entr_sum = np.zeros(self.nr_agents)
+        ep_rew_sum = 0
+        ep_aloss_sum = np.zeros(self.nr_agents + 1)
+        ep_closs_sum = np.zeros(self.nr_agents + 1)
+        ep_alpha_sum = np.zeros(self.nr_agents + 1)
+        ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
+        ep_entr_sum = np.zeros(self.nr_agents + 1)
 
         for step in range(nr_steps):
             # sample action (uniform sample for warmup)
@@ -477,7 +477,7 @@ class Agents:
             next_obs, reward, done, truncated, info = self.env.step(action)
             
             # reward addition to total sum
-            np.add(ep_rew_sum, reward, out = ep_rew_sum)
+            ep_rew_sum += np.mean(reward)
 
             # set done to false if signal is because of time horizon (spinning up)
             if ep_steps == max_episode_len:
@@ -521,26 +521,26 @@ class Agents:
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                     # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
-                            # checkpoint
+                # checkpoint
                 if np.mean(ep_rew_sum) > current_best:
                     current_best = np.mean(ep_rew_sum)
-                    self.actor.save(save_dir, "actor" + "_" + str(step))
-                    self.critic1.save(save_dir, "critic1" + "_" + str(step))
-                    self.critic2.save(save_dir, "critic2" + "_" + str(step))
-                    self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-                    self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
+                    self.actor.save(save_dir, "actor")
+                    self.critic1.save(save_dir, "critic1")
+                    self.critic2.save(save_dir, "critic2")
+                    self.critic1_targ.save(save_dir, "critic1_targ")
+                    self.critic2_targ.save(save_dir, "critic2_targ")
 
                 # reset
                 obs, _ = self.env.reset()
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
-                ep_rew_sum = np.zeros(self.nr_agents)
-                ep_aloss_sum = np.zeros(self.nr_agents)
-                ep_closs_sum = np.zeros(self.nr_agents)
-                ep_entr_sum = np.zeros(self.nr_agents)
-                ep_alpha_sum = np.zeros(self.nr_agents)
-                ep_alphaloss_sum = np.zeros(self.nr_agents)
+                ep_rew_sum = 0
+                ep_aloss_sum = np.zeros(self.nr_agents + 1)
+                ep_closs_sum = np.zeros(self.nr_agents + 1)
+                ep_entr_sum = np.zeros(self.nr_agents + 1)
+                ep_alpha_sum = np.zeros(self.nr_agents + 1)
+                ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
 
             # learn
             if step > learn_delay and step % learn_freq == 0:

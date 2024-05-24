@@ -89,3 +89,44 @@ The following have been reloaded with a version change:
   logger.warn(f"Overriding environment {new_spec.id} already in registry.")
 /home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/envs/registration.py:694: UserWarning: [33mWARN: Overriding environment SpiderFlyGridMA-v0 already in registry.[0m
   logger.warn(f"Overriding environment {new_spec.id} already in registry.")
+slurmstepd: error: *** JOB 9085607 ON v100gpu1 CANCELLED AT 2024-05-22T02:32:44 DUE TO TIME LIMIT ***
+
+###############################################################################
+Hábrók Cluster
+Job 9085607 for user s3515249
+Finished at: Wed May 22 02:32:45 CEST 2024
+
+Job details:
+============
+
+Job ID              : 9085607
+Name                : multi-agent-custom-seq-sac
+User                : s3515249
+Partition           : gpulong
+Nodes               : v100gpu1
+Number of Nodes     : 1
+Cores               : 1
+Number of Tasks     : 1
+State               : TIMEOUT
+Submit              : 2024-05-20T11:16:03
+Start               : 2024-05-20T14:32:26
+End                 : 2024-05-22T02:32:44
+Reserved walltime   : 1-12:00:00
+Used walltime       : 1-12:00:18
+Used CPU time       : --
+% User (Computation): --
+% System (I/O)      : --
+Mem reserved        : 8000M
+Max Mem (Node/step) : 84.00K (v100gpu1, per node)
+Full Max Mem usage  : 84.00K
+Total Disk Read     : 2.28K
+Total Disk Write    : 1.00 
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################
