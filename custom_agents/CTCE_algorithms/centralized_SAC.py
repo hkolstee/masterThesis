@@ -380,7 +380,7 @@ class SAC:
                 self.logger.log(logs, ep, group = "train")
             # log reward seperately
             reward_log = {"reward_sum": ep_rew_sum}
-            self.logger.log(reward_log, ep, "reward")
+            self.logger.log(reward_log, eps, "reward")
 
             # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
             # if self.citylearn:

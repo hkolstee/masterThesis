@@ -466,6 +466,9 @@ class Agents:
         ep_entr_sum = np.zeros(self.nr_agents)
 
         for step in range(nr_steps):
+            # finally, step increment
+            ep_steps += 1
+            
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = [act_space.sample() for act_space in self.env.action_space]
@@ -524,11 +527,11 @@ class Agents:
                             # checkpoint
                 if np.mean(ep_rew_sum) > current_best:
                     current_best = np.mean(ep_rew_sum)
-                    self.actor.save(save_dir, "actor" + "_" + str(step))
-                    self.critic1.save(save_dir, "critic1" + "_" + str(step))
-                    self.critic2.save(save_dir, "critic2" + "_" + str(step))
-                    self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-                    self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
+                    self.actor.save(save_dir, "actor")
+                    self.critic1.save(save_dir, "critic1")
+                    self.critic2.save(save_dir, "critic2")
+                    self.critic1_targ.save(save_dir, "critic1_targ")
+                    self.critic2_targ.save(save_dir, "critic2_targ")
 
                 # reset
                 obs, _ = self.env.reset()
@@ -557,6 +560,3 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-
-            # finally, step increment
-            ep_steps += 1
