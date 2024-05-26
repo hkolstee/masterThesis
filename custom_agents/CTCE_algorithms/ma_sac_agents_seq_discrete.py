@@ -458,12 +458,12 @@ class Agents:
         # steps learned per episode count (for avg)
         ep_learn_steps = 0
         # sum of log values for each ep
-        ep_rew_sum = np.zeros(self.nr_agents)
-        ep_aloss_sum = np.zeros(self.nr_agents)
-        ep_closs_sum = np.zeros(self.nr_agents)
-        ep_alpha_sum = np.zeros(self.nr_agents)
-        ep_alphaloss_sum = np.zeros(self.nr_agents)
-        ep_entr_sum = np.zeros(self.nr_agents)
+        ep_rew_sum = 0
+        ep_aloss_sum = np.zeros(self.nr_agents + 1)
+        ep_closs_sum = np.zeros(self.nr_agents + 1)
+        ep_alpha_sum = np.zeros(self.nr_agents + 1)
+        ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
+        ep_entr_sum = np.zeros(self.nr_agents + 1)
 
         for step in range(nr_steps):
             # finally, step increment
@@ -480,7 +480,7 @@ class Agents:
             next_obs, reward, done, truncated, info = self.env.step(action)
             
             # reward addition to total sum
-            np.add(ep_rew_sum, reward, out = ep_rew_sum)
+            ep_rew_sum += np.mean(reward)
 
             # set done to false if signal is because of time horizon (spinning up)
             if ep_steps == max_episode_len:
@@ -524,7 +524,7 @@ class Agents:
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                     # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
-                            # checkpoint
+                # checkpoint
                 if np.mean(ep_rew_sum) > current_best:
                     current_best = np.mean(ep_rew_sum)
                     self.actor.save(save_dir, "actor")
@@ -538,12 +538,12 @@ class Agents:
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
-                ep_rew_sum = np.zeros(self.nr_agents)
-                ep_aloss_sum = np.zeros(self.nr_agents)
-                ep_closs_sum = np.zeros(self.nr_agents)
-                ep_entr_sum = np.zeros(self.nr_agents)
-                ep_alpha_sum = np.zeros(self.nr_agents)
-                ep_alphaloss_sum = np.zeros(self.nr_agents)
+                ep_rew_sum = 0
+                ep_aloss_sum = np.zeros(self.nr_agents + 1)
+                ep_closs_sum = np.zeros(self.nr_agents + 1)
+                ep_entr_sum = np.zeros(self.nr_agents + 1)
+                ep_alpha_sum = np.zeros(self.nr_agents + 1)
+                ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
 
             # learn
             if step > learn_delay and step % learn_freq == 0:
