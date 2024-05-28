@@ -1,0 +1,139 @@
+The following modules were not unloaded:
+  (Use "module --force purge" to unload all):
+
+  1) 2023.01   2) StdEnv
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.2.0 => GCCcore/11.3.0
+  2) GMP/6.2.1-GCCcore-12.2.0 => GMP/6.2.1-GCCcore-11.3.0
+  3) Python/3.10.8-GCCcore-12.2.0 => Python/3.10.4-GCCcore-11.3.0
+  4) SQLite/3.39.4-GCCcore-12.2.0 => SQLite/3.38.3-GCCcore-11.3.0
+  5) Tcl/8.6.12-GCCcore-12.2.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.2.7-GCCcore-12.2.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.39-GCCcore-12.2.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.2.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.2.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.2.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.3-GCCcore-12.2.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) zlib/1.2.12-GCCcore-12.2.0 => zlib/1.2.12-GCCcore-11.3.0
+
+
+The following have been reloaded with a version change:
+  1) FFTW/3.3.10-GCC-11.3.0 => FFTW/3.3.10-GCC-12.3.0
+  2) FlexiBLAS/3.2.0-GCC-11.3.0 => FlexiBLAS/3.3.1-GCC-12.3.0
+  3) GCC/11.3.0 => GCC/12.3.0
+  4) GCCcore/11.3.0 => GCCcore/12.3.0
+  5) OpenBLAS/0.3.20-GCC-11.3.0 => OpenBLAS/0.3.23-GCC-12.3.0
+  6) Python/3.10.4-GCCcore-11.3.0 => Python/3.11.3-GCCcore-12.3.0
+  7) SQLite/3.38.3-GCCcore-11.3.0 => SQLite/3.42.0-GCCcore-12.3.0
+  8) SciPy-bundle/2022.05-foss-2022a => SciPy-bundle/2023.07-gfbf-2023a
+  9) Tcl/8.6.12-GCCcore-11.3.0 => Tcl/8.6.13-GCCcore-12.3.0
+ 10) XZ/5.2.5-GCCcore-11.3.0 => XZ/5.4.2-GCCcore-12.3.0
+ 11) binutils/2.38-GCCcore-11.3.0 => binutils/2.40-GCCcore-12.3.0
+ 12) bzip2/1.0.8-GCCcore-11.3.0 => bzip2/1.0.8-GCCcore-12.3.0
+ 13) libffi/3.4.2-GCCcore-11.3.0 => libffi/3.4.4-GCCcore-12.3.0
+ 14) libreadline/8.1.2-GCCcore-11.3.0 => libreadline/8.2-GCCcore-12.3.0
+ 15) ncurses/6.3-GCCcore-11.3.0 => ncurses/6.4-GCCcore-12.3.0
+ 16) pybind11/2.9.2-GCCcore-11.3.0 => pybind11/2.11.1-GCCcore-12.3.0
+ 17) zlib/1.2.12-GCCcore-11.3.0 => zlib/1.2.13-GCCcore-12.3.0
+
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.3.0 => GCCcore/11.3.0
+  2) Python/3.11.3-GCCcore-12.3.0 => Python/3.10.4-GCCcore-11.3.0
+  3) SQLite/3.42.0-GCCcore-12.3.0 => SQLite/3.38.3-GCCcore-11.3.0
+  4) SciPy-bundle/2023.07-gfbf-2023a => SciPy-bundle/2022.05-foss-2022a
+  5) Tcl/8.6.13-GCCcore-12.3.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.4.2-GCCcore-12.3.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.40-GCCcore-12.3.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.3.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.3.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.3.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.4-GCCcore-12.3.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) pybind11/2.11.1-GCCcore-12.3.0 => pybind11/2.9.2-GCCcore-11.3.0
+ 13) zlib/1.2.13-GCCcore-12.3.0 => zlib/1.2.12-GCCcore-11.3.0
+
+
+The following have been reloaded with a version change:
+  1) GCCcore/11.3.0 => GCCcore/12.3.0
+  2) Python/3.10.4-GCCcore-11.3.0 => Python/3.11.3-GCCcore-12.3.0
+  3) SQLite/3.38.3-GCCcore-11.3.0 => SQLite/3.42.0-GCCcore-12.3.0
+  4) SciPy-bundle/2022.05-foss-2022a => SciPy-bundle/2023.07-gfbf-2023a
+  5) Tcl/8.6.12-GCCcore-11.3.0 => Tcl/8.6.13-GCCcore-12.3.0
+  6) XZ/5.2.5-GCCcore-11.3.0 => XZ/5.4.2-GCCcore-12.3.0
+  7) binutils/2.38-GCCcore-11.3.0 => binutils/2.40-GCCcore-12.3.0
+  8) bzip2/1.0.8-GCCcore-11.3.0 => bzip2/1.0.8-GCCcore-12.3.0
+  9) libffi/3.4.2-GCCcore-11.3.0 => libffi/3.4.4-GCCcore-12.3.0
+ 10) libreadline/8.1.2-GCCcore-11.3.0 => libreadline/8.2-GCCcore-12.3.0
+ 11) ncurses/6.3-GCCcore-11.3.0 => ncurses/6.4-GCCcore-12.3.0
+ 12) pybind11/2.9.2-GCCcore-11.3.0 => pybind11/2.11.1-GCCcore-12.3.0
+ 13) zlib/1.2.12-GCCcore-11.3.0 => zlib/1.2.13-GCCcore-12.3.0
+
+
+The following have been reloaded with a version change:
+  1) GCCcore/12.3.0 => GCCcore/11.3.0
+  2) Python/3.11.3-GCCcore-12.3.0 => Python/3.10.4-GCCcore-11.3.0
+  3) SQLite/3.42.0-GCCcore-12.3.0 => SQLite/3.38.3-GCCcore-11.3.0
+  4) SciPy-bundle/2023.07-gfbf-2023a => SciPy-bundle/2022.05-foss-2022a
+  5) Tcl/8.6.13-GCCcore-12.3.0 => Tcl/8.6.12-GCCcore-11.3.0
+  6) XZ/5.4.2-GCCcore-12.3.0 => XZ/5.2.5-GCCcore-11.3.0
+  7) binutils/2.40-GCCcore-12.3.0 => binutils/2.38-GCCcore-11.3.0
+  8) bzip2/1.0.8-GCCcore-12.3.0 => bzip2/1.0.8-GCCcore-11.3.0
+  9) libffi/3.4.4-GCCcore-12.3.0 => libffi/3.4.2-GCCcore-11.3.0
+ 10) libreadline/8.2-GCCcore-12.3.0 => libreadline/8.1.2-GCCcore-11.3.0
+ 11) ncurses/6.4-GCCcore-12.3.0 => ncurses/6.3-GCCcore-11.3.0
+ 12) pybind11/2.11.1-GCCcore-12.3.0 => pybind11/2.9.2-GCCcore-11.3.0
+ 13) zlib/1.2.13-GCCcore-12.3.0 => zlib/1.2.12-GCCcore-11.3.0
+
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/envs/registration.py:694: UserWarning: [33mWARN: Overriding environment SpiderFlyGrid-v0 already in registry.[0m
+  logger.warn(f"Overriding environment {new_spec.id} already in registry.")
+/home2/s3515249/masterThesis/venv/lib/python3.10/site-packages/gymnasium/envs/registration.py:694: UserWarning: [33mWARN: Overriding environment SpiderFlyGridMA-v0 already in registry.[0m
+  logger.warn(f"Overriding environment {new_spec.id} already in registry.")
+Traceback (most recent call last):
+  File "/home2/s3515249/masterThesis/spiderenv_training/dqn_3_spider_lowlr/train.py", line 27, in <module>
+    main()
+  File "/home2/s3515249/masterThesis/spiderenv_training/dqn_3_spider_lowlr/train.py", line 21, in main
+    dqn = seqDQN(1e-4, env, batch_size = 256, layer_sizes = (128, 128), eps_steps = 1000000, global_observations = True, buffer_max_size = 1000000, tau = 0.0025) 
+  File "/home2/s3515249/masterThesis/spiderenv_training/custom_agents/CTCE_algorithms/shared_seq_DQN.py", line 61, in __init__
+    self.nr_agents = len(env.action_space)
+AttributeError: 'float' object has no attribute 'action_space'
+
+###############################################################################
+Hábrók Cluster
+Job 9246066 for user s3515249
+Finished at: Sun May 26 12:41:12 CEST 2024
+
+Job details:
+============
+
+Job ID              : 9246066
+Name                : multi-agent-custom-seq-sac
+User                : s3515249
+Partition           : gpulong
+Nodes               : v100gpu14
+Number of Nodes     : 1
+Cores               : 1
+Number of Tasks     : 1
+State               : COMPLETED
+Submit              : 2024-05-26T10:47:19
+Start               : 2024-05-26T12:39:48
+End                 : 2024-05-26T12:41:11
+Reserved walltime   : 1-12:00:00
+Used walltime       :   00:01:23
+Used CPU time       :   00:00:39 (efficiency: 47.73%)
+% User (Computation): 89.65%
+% System (I/O)      : 10.35%
+Mem reserved        : 8000M
+Max Mem (Node/step) : 31.64M (v100gpu14, per node)
+Full Max Mem usage  : 31.64M
+Total Disk Read     : 46.14M
+Total Disk Write    : 915.78K
+
+Acknowledgements:
+=================
+
+Please see this page for information about acknowledging Hábrók in your publications:
+
+https://wiki.hpc.rug.nl/habrok/introduction/scientific_output
+
+################################################################################
