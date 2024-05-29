@@ -292,7 +292,7 @@ class SpiderFlyEnvMA(ParallelEnv):
                         if tuple(loc) == side:
                             spider_rew[spider_idx] = 2
             # if all sides are occupied
-            if count == 8 or sum(spider_rew) == self.nr_spiders:
+            if count == 8 or np.isclose(sum(spider_rew) / 2, self.nr_spiders):
                 flies_caught[fly_idx] = True
                 # remove fly and spawn somewhere else
                 self.move_fly_random_loc(fly_idx)
@@ -346,8 +346,8 @@ class SpiderFlyEnvMA(ParallelEnv):
             truncations = {a: False for a in self.possible_agents}
 
         # also needed for pettingzoo api
-        if any(terminals.values()) or all(truncations.values()):
-            self.agents = []
+        # if any(terminals.values()) or all(truncations.values()):
+        #     self.agents = []
 
         # return obs, rew, done, truncated, info
         return observations, rewards, terminals, truncations, infos
