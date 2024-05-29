@@ -259,6 +259,18 @@ class SpiderFlyEnvMA(ParallelEnv):
         abs_dist = np.abs(np.array(spider_loc) - np.array(fly_loc))
         
         return np.max(abs_dist)
+    
+    def _euclidean_dist(self, loc1, loc2):
+        return np.sqrt(np.square(loc1[0] - loc2[0]) + np.square(loc1[1] - loc2[1]))
+
+    def print_info(self):
+        print("-------------------------------------")
+        self._print_state_matrix()
+        print("SPID_LOCS", self._spider_locations)
+        print("FLY_LOCS", self._fly_locations)
+        print("DISTANCES", [np.abs(np.array(spider_loc) - np.array(self._fly_locations[0])) for spider_loc in self._spider_locations])
+        print("MAX_DIST", [self._max_dist(spider_loc, self._fly_locations[0]) for spider_loc in self._spider_locations])
+        print("EUCL_DIST", [self._euclidean_dist(spider_loc, self._fly_locations[0]) for spider_loc in self._spider_locations])
         
     def check_caught(self):
         flies_caught = [False for _ in range(len(self._fly_locations))]
@@ -268,7 +280,7 @@ class SpiderFlyEnvMA(ParallelEnv):
             sides = [tuple(side) for side in [self._action_to_all_direction[action] + fly_loc for action in [1, 2, 3, 4, 5, 6, 7, 8]]]
             # check in grid array if spiders are on these possible possitions
             count = 0
-            spider_rew = np.repeat(-1, self.nr_spiders)
+            spider_rew = np.repeat(-1., self.nr_spiders)
             for side in sides:
                 # collides with wall
                 if any((coord < 0 or coord >= self.size) for coord in side):
@@ -278,7 +290,7 @@ class SpiderFlyEnvMA(ParallelEnv):
                     count += 1
                     for (spider_idx, loc) in enumerate(self._spider_locations):
                         if tuple(loc) == side:
-                            spider_rew[spider_idx] = 1
+                            spider_rew[spider_idx] = 2
             # if all sides are occupied
             if count == 8 or sum(spider_rew) == self.nr_spiders:
                 flies_caught[fly_idx] = True
@@ -288,7 +300,7 @@ class SpiderFlyEnvMA(ParallelEnv):
             # add eucledian distance to rewards
             # NOTE: BROKEN FOR > 1 FLY, HAVE TO FIND FAST SOLUTION FOR MORE FLIES
             for idx in range(len(spider_rew)):
-                spider_rew[idx] -= self._max_dist(self._spider_locations[idx], self._fly_locations[0])
+                spider_rew[idx] -= self._euclidean_dist(self._spider_locations[idx], self._fly_locations[0])
         
         return flies_caught, spider_rew
 
