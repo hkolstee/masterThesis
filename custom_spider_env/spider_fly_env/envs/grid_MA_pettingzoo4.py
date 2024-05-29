@@ -254,18 +254,18 @@ class SpiderFlyEnvMA(ParallelEnv):
         
     def _max_dist(self, spider_loc, fly_loc):
         """
-        Returns max of x, y distance, with a min of 2.
+        Returns max of x, y distance
         """
         abs_dist = np.abs(np.array(spider_loc) - np.array(fly_loc))
         
-        return np.max([2, np.max(abs_dist)])
+        return np.max(abs_dist)
         
     def check_caught(self):
         flies_caught = [False for _ in range(len(self._fly_locations))]
 
         for fly_idx, fly_loc in enumerate(self._fly_locations):
             # create set of locations around fly
-            sides = [tuple(side) for side in [self._action_to_direction[action] + fly_loc for action in [1, 2, 3, 4]]]
+            sides = [tuple(side) for side in [self._action_to_all_direction[action] + fly_loc for action in [1, 2, 3, 4, 5, 6, 7, 8]]]
             # check in grid array if spiders are on these possible possitions
             count = 0
             spider_rew = np.repeat(-1, self.nr_spiders)
@@ -280,7 +280,7 @@ class SpiderFlyEnvMA(ParallelEnv):
                         if tuple(loc) == side:
                             spider_rew[spider_idx] = 1
             # if all sides are occupied
-            if count == 4 or sum(spider_rew) == self.nr_spiders:
+            if count == 8 or sum(spider_rew) == self.nr_spiders:
                 flies_caught[fly_idx] = True
                 # remove fly and spawn somewhere else
                 self.move_fly_random_loc(fly_idx)
