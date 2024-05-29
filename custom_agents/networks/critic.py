@@ -24,7 +24,7 @@ class Critic(MultiLayerPerceptron):
         action_space (gymnasium.spaces): Action space
         layer_sizes (tuple:int): Sizes of the dense network layers
     """
-    def __init__(self, lr, obs_size, act_size, discrete = False, layer_sizes = (256, 256)):
+    def __init__(self, lr, obs_size, act_size, layer_sizes = (256, 256), discrete = False):
         self.discrete = discrete
         # different in/output for discrete / continuous action space
         if discrete:

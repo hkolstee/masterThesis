@@ -13,14 +13,12 @@ abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-from ..envs.grid_MA_pettingzoo import SpiderFlyEnvMA
-
 class PettingZooWrapper(Wrapper):
     """
     A wrapper class to correct the output of the pettingzoo env to a gymnasium-like env
     using lists instead of dictionaries.
     """
-    def __init__(self, env: SpiderFlyEnvMA, normalize = False):
+    def __init__(self, env, normalize = False):
         if normalize:
             # normalization wrapper
             self.env = normalize_obs_v0(dtype_v0(env, np.float32))

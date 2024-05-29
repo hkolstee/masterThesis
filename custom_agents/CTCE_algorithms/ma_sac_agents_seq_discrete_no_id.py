@@ -58,7 +58,8 @@ class Agents:
                  batch_size = 256,
                  layer_sizes = (256, 256),
                  log_dir = "tensorboard_logs",
-                 global_observations = False):
+                 global_observations = False
+                 ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -181,7 +182,6 @@ class Agents:
         next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
         replay_act = [torch.tensor(actions, dtype=torch.int64).to(self.device) for actions in replay_act_list]
         # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
-        # NOTE: need to find a nice way to incorporate individual reward components into the intermediate losses
         rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0).to(self.device)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
 
@@ -198,7 +198,7 @@ class Agents:
         # keep track of index of point where to add sequential actions to input tensor
         seq_action_index = obs.shape[1]
 
-        # preconstruct input tensors to which the sequential actions will be added, and onehot ids will be changed
+        # preconstruct input tensors to which the sequential actions will be added
         with torch.no_grad():
             # prepare input
             input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
@@ -209,7 +209,7 @@ class Agents:
             # SEQUENTIALLY update shared critics/actor for each agent
             for agent_idx in range(self.nr_agents):
                 if agent_idx > 0:
-                    # last target Q input is same as next normal Q input (even onehot id)
+                    # last target Q input is same as next normal Q input 
                     input_tensor = targ_input_tensor.clone().detach()
 
                 # get alpha for remainder of this agent loop
@@ -409,7 +409,7 @@ class Agents:
         return action_list
     
     def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
-              checkpoint = 100000, save_dir = "models"):
+              checkpoint = 250000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -501,11 +501,11 @@ class Agents:
                             # checkpoint
                 if np.mean(ep_rew_sum) > current_best:
                     current_best = np.mean(ep_rew_sum)
-                    self.actor.save(save_dir, "actor")
-                    self.critic1.save(save_dir, "critic1")
-                    self.critic2.save(save_dir, "critic2")
-                    self.critic1_targ.save(save_dir, "critic1_targ")
-                    self.critic2_targ.save(save_dir, "critic2_targ")
+                    self.actor.save(save_dir, "actor_best")
+                    self.critic1.save(save_dir, "critic1_best")
+                    self.critic2.save(save_dir, "critic2_best")
+                    self.critic1_targ.save(save_dir, "critic1_targ_best")
+                    self.critic2_targ.save(save_dir, "critic2_targ_best")
 
                 # reset
                 obs, _ = self.env.reset()
@@ -535,3 +535,9 @@ class Agents:
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
 
+            if step % checkpoint == 0:
+                self.actor.save(save_dir, "actor_" + str(step))
+                self.critic1.save(save_dir, "critic1_" + str(step))
+                self.critic2.save(save_dir, "critic2_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ_" + str(step))
