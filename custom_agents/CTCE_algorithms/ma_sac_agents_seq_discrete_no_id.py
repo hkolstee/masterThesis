@@ -182,7 +182,7 @@ class Agents:
         next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
         replay_act = [torch.tensor(actions, dtype=torch.int64).to(self.device) for actions in replay_act_list]
         # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
-        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0).to(self.device)
+        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).max(0).to(self.device)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
 
         # if we are not given the global observation, for each agent, and we need to construct it

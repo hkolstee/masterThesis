@@ -192,7 +192,7 @@ class SpiderFlyEnvMA(ParallelEnv):
         self._add_spiders(self.nr_spiders)
         # get observations
         observations = self._get_obs()
-
+    
         if self.render_mode == "ascii":
             # print grid, spiders, and flies 
             self._print_state_matrix()
@@ -328,16 +328,17 @@ class SpiderFlyEnvMA(ParallelEnv):
         # get reward, each step 
         if any(flies_caught):
             rewards = {a: 1 for a in self.possible_agents}
-            # terminals = {a: True for a in self.possible_agents}
+            terminals = {a: True for a in self.possible_agents}
         else:
-            rewards = {a: 0.0005 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
+            terminals = {a: False for a in self.possible_agents}
+            rewards = {a: 0.001 * (rew) for (rew, a) in zip(spiders_rew, self.possible_agents)}
 
         # get observation
         observations = self._get_obs()
         # infos
         infos = {a: {} for a in self.possible_agents}
         # terminals
-        terminals = {a: False for a in self.possible_agents}
+        
         # truncations
         if self.max_steps == self.timestep:
             truncations = {a: True for a in self.possible_agents}
@@ -346,8 +347,8 @@ class SpiderFlyEnvMA(ParallelEnv):
             truncations = {a: False for a in self.possible_agents}
 
         # also needed for pettingzoo api
-        # if any(terminals.values()) or all(truncations.values()):
-        #     self.agents = []
+        if any(terminals.values()) or all(truncations.values()):
+            self.agents = []
 
         # return obs, rew, done, truncated, info
         return observations, rewards, terminals, truncations, infos
