@@ -190,9 +190,9 @@ class Agents:
 
                 # --- CRITIC GRADIENT ---
                 # Q values to measure against target
-                print("INPUT AGENT ", agent_idx)
-                print(input_tensor)
-                print(replay_act[agent_idx].shape, replay_act[agent_idx])
+                # print("INPUT AGENT ", agent_idx)
+                # print(input_tensor.shape)
+                # print(replay_act[agent_idx].shape, replay_act[agent_idx])
                 q1 = self.critic1.forward(input_tensor, replay_act[agent_idx])
                 q2 = self.critic2.forward(input_tensor, replay_act[agent_idx])
 
@@ -209,9 +209,9 @@ class Agents:
                         targ_input_tensor = input_tensor.clone().detach()
 
                         # add additional actions
-                        print("replay action added with these shapes and indices")
-                        print(replay_act[agent_idx].shape[1], targ_input_tensor.shape)
-                        print(seq_action_index, seq_action_index + replay_act[agent_idx].shape[1])
+                        # print("replay action added with these shapes and indices")
+                        # print(replay_act[agent_idx].shape[1], targ_input_tensor.shape)
+                        # print(seq_action_index, seq_action_index + replay_act[agent_idx].shape[1])
                         targ_input_tensor[:, seq_action_index : seq_action_index + replay_act[agent_idx].shape[1]] = replay_act[agent_idx]
                         # move index 
                         seq_action_index += replay_act[agent_idx].shape[1]
@@ -220,10 +220,10 @@ class Agents:
                         acts_ip1, logp_ip1 = self.actor.action_distr_sample(targ_input_tensor)
 
                         # get critics output of next stage in sequence
-                        print("TARG INPUT")
-                        print(targ_input_tensor.shape)
-                        print(targ_input_tensor)
-                        print(acts_ip1)
+                        # print("TARG INPUT")
+                        # print(targ_input_tensor.shape)
+                        # print(targ_input_tensor.shape)
+                        # print(acts_ip1.shape)
                         q1_targ = self.critic1_targ(targ_input_tensor, acts_ip1)
                         q2_targ = self.critic2_targ(targ_input_tensor, acts_ip1)
 
@@ -231,7 +231,7 @@ class Agents:
                         min_q_targ = torch.minimum(q1_targ, q2_targ)
                         # we do not compare to the temporal difference target for all agents in sequence except the last.
                         # we just compare to the next in sequence Q val as target (no reward/discount)
-                        target = (min_q_targ - alpha_ip1.unsqueeze(1) * logp_ip1).squeeze()
+                        target = (min_q_targ - alpha_ip1 * logp_ip1).squeeze()
                     else:
                         """
                         FOR AGENT i = m:
@@ -253,15 +253,15 @@ class Agents:
                         q1_targ = self.critic1_targ.forward(targ_input_tensor, act_0_nextobs)
                         q2_targ = self.critic2_targ.forward(targ_input_tensor, act_0_nextobs)
 
-                        print("LAST TARG INPUT")
-                        print(targ_input_tensor.shape)
-                        print(targ_input_tensor)
-                        print(acts_ip1)
+                        # print("LAST TARG INPUT")
+                        # print(targ_input_tensor.shape)
+                        # print(targ_input_tensor.shape)
+                        # print(acts_ip1.shape)
 
                         # Clipped double Q trick
                         min_q_targ = torch.minimum(q1_targ, q2_targ)
                         # Action probabilities can be used to estimate the expectation (cleanRL)
-                        q_targ = min_q_targ - alpha_0.unsqueeze(1) * logp_0_nextobs
+                        q_targ = min_q_targ - alpha_0 * logp_0_nextobs
 
                         # for the last we do compare with the temporal difference target, so we use reward (mean) and discount
                         target = (rewards + self.gamma * (1 - dones[agent_idx]) * q_targ).squeeze()
@@ -293,7 +293,7 @@ class Agents:
                 # Clipped double Q-trick
                 q_policy = torch.minimum(q1_policy, q2_policy)
                 # entropy regularized loss
-                loss_policy = (alpha_i.unsqueeze(1) * logp_i - q_policy).mean()
+                loss_policy = (alpha_i * logp_i - q_policy).mean()
 
                 # step along gradient
                 self.actor.optimizer.zero_grad()
@@ -371,8 +371,9 @@ class Agents:
             for agent_idx in range(self.nr_agents):
                 if agent_idx > 0:
                     # add previous sequential action on the right indices
-                    print("REPLAY ACTION SHAPE", action_list[-1].shape)
-                    print("ADDED TO INPUT SHAPE", input_tensor.shape)
+                    # print("REPLAY ACTION SHAPE", action_list[-1].shape)
+                    # print("ADDED TO INPUT SHAPE", input_tensor.shape)
+                    # print("at index", seq_action_index, seq_action_index + action_list[-1].shape[0])
                     input_tensor[seq_action_index : seq_action_index + action_list[-1].shape[0]] = action_list[-1]
                     # move sequential index
                     seq_action_index += action_list[-1].shape[0]
