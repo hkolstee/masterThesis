@@ -182,7 +182,7 @@ class Agents:
         next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
         replay_act = [torch.tensor(actions, dtype=torch.int64).to(self.device) for actions in replay_act_list]
         # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
-        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).max(0).to(self.device)
+        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).min(0).values.to(self.device)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
 
         # if we are not given the global observation, for each agent, and we need to construct it
@@ -433,6 +433,7 @@ class Agents:
         ep_learn_steps = 0
         # sum of log values for each ep
         ep_rew_sum = np.zeros(self.nr_agents)
+        ep_sharedrew_sum = 0
         ep_aloss_sum = np.zeros(self.nr_agents)
         ep_closs_sum = np.zeros(self.nr_agents)
         ep_alpha_sum = np.zeros(self.nr_agents)
@@ -455,6 +456,7 @@ class Agents:
             
             # reward addition to total sum
             np.add(ep_rew_sum, reward, out = ep_rew_sum)
+            ep_sharedrew_sum += np.min(reward)
 
             # set done to false if signal is because of time horizon (spinning up)
             if ep_steps == max_episode_len:
@@ -486,6 +488,7 @@ class Agents:
                     self.logger.log(self.logs, ep, group = "train")
                 # log reward seperately
                 self.rollout_log = {"reward_sum": ep_rew_sum,
+                                    "shared_rew_sum": ep_sharedrew_sum,
                                     "ep_steps": ep_steps}
                 self.logger.log(self.rollout_log, ep, "rollout")
                 
@@ -512,6 +515,7 @@ class Agents:
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
+                ep_sharedrew_sum = 0
                 ep_rew_sum = np.zeros(self.nr_agents)
                 ep_aloss_sum = np.zeros(self.nr_agents)
                 ep_closs_sum = np.zeros(self.nr_agents)

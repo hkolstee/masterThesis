@@ -459,11 +459,11 @@ class Agents:
         ep_learn_steps = 0
         # sum of log values for each ep
         ep_rew_sum = 0
-        ep_aloss_sum = np.zeros(self.nr_agents + 1)
-        ep_closs_sum = np.zeros(self.nr_agents + 1)
-        ep_alpha_sum = np.zeros(self.nr_agents + 1)
-        ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
-        ep_entr_sum = np.zeros(self.nr_agents + 1)
+        ep_aloss_sum = np.zeros(self.nr_agents)
+        ep_closs_sum = np.zeros(self.nr_agents)
+        ep_alpha_sum = np.zeros(self.nr_agents)
+        ep_alphaloss_sum = np.zeros(self.nr_agents)
+        ep_entr_sum = np.zeros(self.nr_agents)
 
         for step in range(nr_steps):
             # finally, step increment
@@ -539,11 +539,11 @@ class Agents:
                 ep_steps = 0
                 ep_learn_steps = 0
                 ep_rew_sum = 0
-                ep_aloss_sum = np.zeros(self.nr_agents + 1)
-                ep_closs_sum = np.zeros(self.nr_agents + 1)
-                ep_entr_sum = np.zeros(self.nr_agents + 1)
-                ep_alpha_sum = np.zeros(self.nr_agents + 1)
-                ep_alphaloss_sum = np.zeros(self.nr_agents + 1)
+                ep_aloss_sum = np.zeros(self.nr_agents)
+                ep_closs_sum = np.zeros(self.nr_agents)
+                ep_entr_sum = np.zeros(self.nr_agents)
+                ep_alpha_sum = np.zeros(self.nr_agents)
+                ep_alphaloss_sum = np.zeros(self.nr_agents)
 
             # learn
             if step > learn_delay and step % learn_freq == 0:
