@@ -58,7 +58,8 @@ class Agents:
                  batch_size = 256,
                  layer_sizes = (256, 256),
                  log_dir = "tensorboard_logs",
-                 global_observations = False):
+                 global_observations = False
+                 ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
@@ -466,6 +467,9 @@ class Agents:
         ep_entr_sum = np.zeros(self.nr_agents + 1)
 
         for step in range(nr_steps):
+            # finally, step increment
+            ep_steps += 1
+            
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = [act_space.sample() for act_space in self.env.action_space]
@@ -557,6 +561,3 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-
-            # finally, step increment
-            ep_steps += 1
