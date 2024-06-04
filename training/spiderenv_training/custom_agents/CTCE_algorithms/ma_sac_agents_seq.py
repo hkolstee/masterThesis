@@ -2,32 +2,21 @@ import os
 import sys
 
 import numpy as np
-import pandas as pd
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as functional
-
-# temporary needed
-from custom_agent.CTCE.citylearn_wrapper import CityLearnWrapper
-from custom_reward.custom_reward import CustomReward
-
-from citylearn.citylearn import CityLearnEnv
-from citylearn.wrappers import NormalizedSpaceWrapper
+import torch.nn.functional as F
 
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 sys.path.append(dname)
 
-from ..SAC_components.ma_replay_buffer import MultiAgentReplayBuffer
-from ..SAC_components.critic import Critic
-from ..SAC_components.actor import Actor
-from ..SAC_components.logger import Logger
+from ..replay_buffers.ma_replay_buffer import MultiAgentReplayBuffer
+from ..networks.critic import Critic
+from ..networks.actor import Actor
+from ..utils.logger import Logger
 
 from copy import deepcopy
-
-from tqdm import tqdm
 
 class Agents:
     """
@@ -55,12 +44,14 @@ class Agents:
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
-                 log_dir = "tensorboard_logs"
+                 log_dir = "tensorboard_logs",
+                 global_observations = False
                  ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
         self.batch_size = batch_size
+        self.global_observations = global_observations
         self.nr_agents = len(env.action_space)
         
         # initialize device
@@ -69,45 +60,38 @@ class Agents:
         # initialize logger
         self.logger = Logger(self.env, log_dir)
         
-        # for now done like this: check if citylearn env with custom reward function for 
-        #   additional logging
-        self.citylearn = isinstance(self.env.reward_function, CustomReward) \
-                            if (isinstance(self.env, CityLearnWrapper) \
-                            or isinstance(self.env, CityLearnEnv) \
-                            or isinstance(self.env, NormalizedSpaceWrapper)) \
-                            else False
-
         # initialize replay buffer
-        obs_size_list = [obs.shape for obs in self.env.observation_space]
-        act_size_list = [act.shape for act in self.env.action_space]
-        self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_size_list, act_size_list, batch_size)
+        obs_sizes = [obs.shape for obs in self.env.observation_space]
+        act_sizes = [act.shape for act in self.env.action_space]
+        self.replay_buffer = MultiAgentReplayBuffer(buffer_max_size, obs_sizes, act_sizes, batch_size)
         
-        # one-hot identity per agent
-        self.agent_ids = functional.one_hot(torch.tensor(range(self.nr_agents))).float()
-
-        # global obs and action for centralized critics
-        obs_size_global = sum([obs.shape[0] for obs in self.env.observation_space])
+        # if not all agents receive global observations from env
+        if not self.global_observations:
+            obs_size_global = sum([size[0] for size in obs_sizes])
+        # if they do
+        else:
+            obs_size_global = obs_sizes[0][0]
+        # global action size
         act_size_global = sum([act.shape[0] for act in self.env.action_space])
 
         # policies according to method as described in: https://arxiv.org/pdf/1910.00120.pdf
         #   Simply: sequentially calculate policies, while conditioning next policy calculation on action result of last.
-        #           Done sequentially per agent, where we do not care about order. One actor in total for all agents, with parameter sharing.
-        #           Requires homogenous agent action spaces.
+        #           Done sequentially per agent, where order is regular agent order. One actor in total for all agents, with parameter sharing.
+        #           Requires homogenous agent action spaces. No one hot ID required as extra sequential actions create disjoint obs spaces.
         # Two centralized critics (two for stable learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
-        self.actor_input_size = obs_size_global + act_size_global - self.env.action_space[0].shape[0] + self.agent_ids.shape[0]
+        actor_input_size = obs_size_global + act_size_global - self.env.action_space[0].shape[0] 
         self.actor = Actor(lr_actor, 
-                           self.actor_input_size, 
+                           actor_input_size, 
                            self.env.action_space[0].shape[0],
                            self.env.action_space[0].low,
                            self.env.action_space[0].high,
                            layer_sizes) 
-        self.critic_input_size = obs_size_global + act_size_global + self.agent_ids.shape[0]
         self.critic1 = Critic(lr_critic,
-                              obs_size_global + self.agent_ids.shape[0],
+                              obs_size_global,
                               act_size_global,
                               layer_sizes)
         self.critic2 = Critic(lr_critic,
-                              obs_size_global + self.agent_ids.shape[0],
+                              obs_size_global,
                               act_size_global,
                               layer_sizes)
 
@@ -130,79 +114,6 @@ class Agents:
             # the entropy coef alpha which is to be optimized
             self.log_alphas.append(torch.ones(1, requires_grad = True, device = self.device))   # device this way otherwise leaf tensor
             self.alpha_optimizers.append(torch.optim.Adam([self.log_alphas[-1]], lr = lr_critic))   # shares critic lr
-
-    def createPaddedInput(self, seq_acts, agent_idx, total_size, observations = None):
-        # add sequential actions to observations, pad with 0's for remaining actions, add one hot id vector
-        if observations != None:
-            input = torch.cat([observations, seq_acts], dim = 1)
-        else:
-            input = seq_acts
-        # get number of 0's that need to be added (total - current - id_vector)
-        padding_len = total_size - input.shape[1] - self.agent_ids.shape[0]
-        # add these 0's
-        input = functional.pad(input, (0, padding_len), value = 0)
-        # make the onehot id vector from shape (nr_agents) to (batch, nr_agents) so we can cat
-        agent_ids = self.agent_ids[agent_idx].unsqueeze(0).expand(input.shape[0], -1)
-        # cat id vectors
-        input = torch.cat([input, agent_ids], dim = 1)
-
-        return input
-
-    def getSequentialAct(self, observations):
-        """Sequentially get actions by introducing the last output as input into the next network forward"""
-        # initialize as empty(batch, 0)
-        seq_acts = torch.empty((observations.shape[0], 0))
-        seq_act_list = []
-        logps_list = []
-        for agent_idx in range(self.nr_agents):
-            # get action and logp
-            input = self.createPaddedInput(seq_acts, agent_idx, self.actor_input_size, observations)
-            act, logp = self.actor.normal_distr_sample(input)
-            # prepare for next input
-            #   detach from graph such that we do not backward through all 
-            #   previous actors on gradient update
-            seq_acts = torch.cat([seq_acts, act.detach()], dim = 1)
-            # append
-            seq_act_list.append(act)
-            logps_list.append(logp)
-
-        return seq_act_list, logps_list
-    
-    def getSequentialQs(self, obs, acts, next_obs, next_acts):
-        """
-        Get Q-values by iteratively introducing agent actions sequentially.
-        """
-        seq_q1, seq_q2, seq_q1_targ, seq_q2_targ = [],[],[],[]
-        
-        # current sequential actions
-        seq_acts = torch.empty((acts[0].shape[0], 0))
-        
-        for agent_idx in range(self.nr_agents):
-            # add action for input
-            seq_acts = torch.column_stack((seq_acts, acts[agent_idx].detach()))
-            
-            # targ no grad
-            with torch.no_grad():
-                if agent_idx == 0:
-                    padded_input = self.createPaddedInput(next_acts[0], agent_idx, self.critic_input_size - next_obs.shape[1])
-                    q1_targ = self.critic1_targ.forward(next_obs, padded_input)
-                    q2_targ = self.critic2_targ.forward(next_obs, padded_input)
-                    padded_input = self.createPaddedInput(seq_acts, agent_idx, self.critic_input_size - obs.shape[1])
-                else:
-                    padded_input = self.createPaddedInput(seq_acts, agent_idx, self.critic_input_size - obs.shape[1])
-                    q1_targ = self.critic1_targ.forward(obs, padded_input)
-                    q2_targ = self.critic2_targ.forward(obs, padded_input)
-            # with grad
-            q1 = self.critic1.forward(obs, padded_input)
-            q2 = self.critic2.forward(obs, padded_input)
-
-            # add to list
-            seq_q1.append(q1)
-            seq_q2.append(q2)
-            seq_q1_targ.append(q1_targ)
-            seq_q2_targ.append(q2_targ)
-
-        return seq_q1, seq_q2, seq_q1_targ, seq_q2_targ
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -229,9 +140,9 @@ class Agents:
             return 0, None, None, None, None, None
         
         # logging lists for return of the function
-        loss_policy_list = []
-        loss_critic_list = []
-        log_prob_list = []
+        loss_pi_list = []
+        loss_Q_list = []
+        logp_list = []
         alpha_list = []
         alpha_loss_list = []
         
@@ -243,127 +154,176 @@ class Agents:
         obs = [torch.tensor(obs, dtype=torch.float32).to(self.device) for obs in obs_list]
         next_obs = [torch.tensor(next_obs, dtype=torch.float32).to(self.device) for next_obs in next_obs_list]
         replay_act = [torch.tensor(actions, dtype=torch.float32).to(self.device) for actions in replay_act_list]
-        rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
+        # rewards = [torch.tensor(rewards, dtype=torch.float32).to(self.device) for rewards in rewards_list]
+        rewards = torch.tensor(np.array(rewards_list), dtype=torch.float32).mean(0).to(self.device)
         dones = [torch.tensor(dones, dtype=torch.int32).to(self.device) for dones in dones_list]
+
+        # if we are not given the global observation, for each agent, and we need to construct it
+        with torch.no_grad():
+            if not self.global_observations:
+                obs = torch.cat(obs, dim = 1)
+                next_obs = torch.cat(next_obs, dim = 1)
+            else:
+                # all agents are given global observations
+                obs = obs[0]
+                next_obs = next_obs[0]
+
+        # keep track of index of point where to add sequential actions to input tensor
+        seq_action_index = obs.shape[1]
+
+        # preconstruct input tensors to which the sequential actions will be added
+        with torch.no_grad():
+            # prepare input
+            input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+            # observations first
+            input_tensor[:, 0 : obs.shape[1]] = obs
         
         with torch.autograd.set_detect_anomaly(True):
-            # combi set of states and actions from all agents for the critics (shape = (batch, total_obs)
-            obs_set = torch.cat(obs, dim = 1)
-            next_obs_set = torch.cat(next_obs, dim = 1)
-            replay_act_set = torch.cat(replay_act, dim = 1)
-            # get set of current policy actions for next observation 
-            with torch.no_grad():
-                pi_next_actions, logp_next_obs = self.getSequentialAct(next_obs_set)
-            
-            # set of current policy actions for current observation
-            # with grad 
-            pi_actions, logp = self.getSequentialAct(obs_set)
-            # create entire set, without grad
-            pi_act_nograd = [act.detach() for act in pi_actions]
-            
-            alphas = []
+            # SEQUENTIALLY update shared critics/actor for each agent
             for agent_idx in range(self.nr_agents):
-                # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
-                #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
-                # we detach because otherwise we backward through the graph of previous calculations using log_prob
-                #   which also raises an error fortunately, otherwise I would have missed this
-                alpha_loss = -(self.log_alphas[agent_idx].exp() * (logp[agent_idx].detach() + self.entropy_targs[agent_idx])).mean()
+                if agent_idx > 0:
+                    # last target Q input is same as next normal Q input 
+                    input_tensor = targ_input_tensor.clone().detach()
+
+                # get alpha for remainder of this agent loop
+                alpha_i = torch.exp(self.log_alphas[agent_idx].detach()).to(self.device)
+
+                # --- CRITIC GRADIENT ---
+                # Q values to measure against target
+                print("INPUT AGENT ", agent_idx)
+                print(input_tensor)
+                print(replay_act[agent_idx].shape, replay_act[agent_idx])
+                q1 = self.critic1.forward(input_tensor, replay_act[agent_idx])
+                q2 = self.critic2.forward(input_tensor, replay_act[agent_idx])
+
+                with torch.no_grad():
+                    if agent_idx < (self.nr_agents - 1):
+                        """
+                        FOR ALL AGENTS IN SEQUENCE i = (1, ..., m - 1):
+                            We compare against only the Q-value of the next in sequence.
+                        """
+                        # alpha of next in sequence
+                        alpha_ip1 = torch.exp(self.log_alphas[agent_idx + 1].detach())
+
+                        # first we have to add the actions to the input tensor, and change the onehot id
+                        targ_input_tensor = input_tensor.clone().detach()
+
+                        # add additional actions
+                        print("replay action added with these shapes and indices")
+                        print(replay_act[agent_idx].shape[1], targ_input_tensor.shape)
+                        print(seq_action_index, seq_action_index + replay_act[agent_idx].shape[1])
+                        targ_input_tensor[:, seq_action_index : seq_action_index + replay_act[agent_idx].shape[1]] = replay_act[agent_idx]
+                        # move index 
+                        seq_action_index += replay_act[agent_idx].shape[1]
+
+                        # get actor output of next stage in sequence (i + 1)
+                        acts_ip1, logp_ip1 = self.actor.action_distr_sample(targ_input_tensor)
+
+                        # get critics output of next stage in sequence
+                        print("TARG INPUT")
+                        print(targ_input_tensor.shape)
+                        print(targ_input_tensor)
+                        print(acts_ip1)
+                        q1_targ = self.critic1_targ(targ_input_tensor, acts_ip1)
+                        q2_targ = self.critic2_targ(targ_input_tensor, acts_ip1)
+
+                        # Clipped double Q trick
+                        min_q_targ = torch.minimum(q1_targ, q2_targ)
+                        # we do not compare to the temporal difference target for all agents in sequence except the last.
+                        # we just compare to the next in sequence Q val as target (no reward/discount)
+                        target = (min_q_targ - alpha_ip1.unsqueeze(1) * logp_ip1).squeeze()
+                    else:
+                        """
+                        FOR AGENT i = m:
+                            We compare against only the temporal difference target of the first in sequence.
+                        """
+                        # alpha of first in sequence
+                        alpha_0 = torch.exp(self.log_alphas[0].detach())
+
+                        # create new target tensors
+                        targ_input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+
+                        # add next observation
+                        targ_input_tensor[:, 0 : next_obs.shape[1]] = next_obs
+
+                        # get actor output of first stage/agent (agent 0) in sequence for the next observation
+                        act_0_nextobs, logp_0_nextobs = self.actor.action_distr_sample(targ_input_tensor)
+
+                        # get critics output of first stage in sequence
+                        q1_targ = self.critic1_targ.forward(targ_input_tensor, act_0_nextobs)
+                        q2_targ = self.critic2_targ.forward(targ_input_tensor, act_0_nextobs)
+
+                        print("LAST TARG INPUT")
+                        print(targ_input_tensor.shape)
+                        print(targ_input_tensor)
+                        print(acts_ip1)
+
+                        # Clipped double Q trick
+                        min_q_targ = torch.minimum(q1_targ, q2_targ)
+                        # Action probabilities can be used to estimate the expectation (cleanRL)
+                        q_targ = min_q_targ - alpha_0.unsqueeze(1) * logp_0_nextobs
+
+                        # for the last we do compare with the temporal difference target, so we use reward (mean) and discount
+                        target = (rewards + self.gamma * (1 - dones[agent_idx]) * q_targ).squeeze()
+
+                # loss is MSEloss
+                loss_critic1 = F.mse_loss(q1, target)
+                loss_critic2 = F.mse_loss(q2, target)
+                loss_critic = loss_critic1 + loss_critic2 # factor of 0.5 also used
 
                 # backward prop + gradient step
-                self.alpha_optimizers[agent_idx].zero_grad()        
-                alpha_loss.backward()
-                self.alpha_optimizers[agent_idx].step()
-
-                # get current alpha
-                alphas.append(torch.exp(self.log_alphas[agent_idx].detach()))
-
-                # log values
-                alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
-
-            # CRITIC GRADIENT            
-            # get Q values
-            q1, q2, q1_targ, q2_targ = self.getSequentialQs(obs_set, replay_act, next_obs_set, pi_next_actions)
-            
-            with torch.no_grad():
-                # get min q_targ network values
-                q_targ = []
-                for targ_val1, targ_val2 in zip(q1_targ, q2_targ):
-                    q_targ.append(torch.minimum(targ_val1, targ_val2))
-
-                # gradients for all but last critic in sequence is the normal target but substituted by next critic in sequence
-                #   with current state and actions
-                bellman = []
-                for agent_idx in range(self.nr_agents - 1):
-                    # we take the next in sequence
-                    idx = agent_idx + 1
-                    # bellman target on next in sequence q_targ network for agents 1, ..., m-1
-                    bellman_targ = rewards[idx] + self.gamma * (1 - dones[idx]) * (q_targ[idx] - alphas[idx] * logp_next_obs[idx])
-                    bellman.append(bellman_targ)
-                # last critic is compared to first in sequence, with next state (which is used in Q value calculation, see getSequentialQs())
-                bellman_targ = rewards[0] + self.gamma * (1 - dones[0]) * (q_targ[0] - alphas[0] * logp_next_obs[0])
-                bellman.append(bellman_targ)
-            
-            # loss for each critic (except last) based on comparison to next in sequence
-            for agent_idx in range(self.nr_agents):
-                print(agent_idx)
-                loss_critic1 = functional.mse_loss(q1[agent_idx], bellman[agent_idx])
-                loss_critic2 = functional.mse_loss(q2[agent_idx], bellman[agent_idx])
-                loss_critic = loss_critic1 + loss_critic2
-                
-                # zero gradient
                 self.critic1.optimizer.zero_grad()
                 self.critic2.optimizer.zero_grad()
-                # backward prop
                 loss_critic.backward()
-                # step
                 self.critic1.optimizer.step()
                 self.critic2.optimizer.step()
 
-                # log loss
-                loss_critic_list.append(loss_critic.cpu().detach().numpy())    
-
-            for agent_idx in range(self.nr_agents):
-                # ACTOR GRADIENT
+                # --- ACTOR GRADIENT ---
+                # first we compute the actor output for the current stage (i) in the sequence
+                act_i, logp_i = self.actor.action_distr_sample(input_tensor)
                 # first freeze critic gradient calculation to save computation
                 for params in self.critic1.parameters():
                     params.requires_grad = False
                 for params in self.critic2.parameters():
                     params.requires_grad = False
 
-                # compute Q-values
-                #   Sequence of actions in sequential critic, where only the gradient graph of the current policy persists
-                if agent_idx == 0:
-                    seq_actions = pi_actions[0]
-                else:
-                    seq_actions = torch.column_stack((torch.column_stack(pi_act_nograd[:agent_idx]), pi_actions[agent_idx]))
-                # padded input
-                padded_input = self.createPaddedInput(seq_actions, agent_idx, self.critic_input_size - obs_set.shape[1])
-                # forward
-                q1_policy = self.critic1.forward(obs_set, padded_input)
-                q2_policy = self.critic2.forward(obs_set, padded_input)
-                
-                # take min of these two 
-                #   = clipped Q-value for stable learning, reduces overestimation
+                # compute Q-values (NOTE: SAME AS ABOVE? TEST IF MATTERS)
+                q1_policy = self.critic1.forward(input_tensor, act_i)
+                q2_policy = self.critic2.forward(input_tensor, act_i)
+                # Clipped double Q-trick
                 q_policy = torch.minimum(q1_policy, q2_policy)
                 # entropy regularized loss
-                loss_policy = (alphas[agent_idx] * logp[agent_idx] - q_policy).mean()
+                loss_policy = (alpha_i.unsqueeze(1) * logp_i - q_policy).mean()
 
-                # zero grad
+                # step along gradient
                 self.actor.optimizer.zero_grad()
-                # backward prop
                 loss_policy.backward()
-                # step down gradient
                 self.actor.optimizer.step()
 
-                # unfreeze critic gradients
+                # unfreeze critic gradient
                 for params in self.critic1.parameters():
                     params.requires_grad = True
                 for params in self.critic2.parameters():
                     params.requires_grad = True
 
-                # log policy loss
-                loss_policy_list.append(loss_policy.cpu().detach().numpy())
-            
+                # --- AUTOMATIC ENTROPY TEMPERATURE TUNING ---
+                #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
+                # we detach because otherwise we backward through the graph of previous calculations using log_prob
+                # Action probabilities can be used to estimate the expectation (cleanRL)
+                alpha_loss = (-self.log_alphas[agent_idx].exp() * logp_i.detach() - self.log_alphas[agent_idx].exp() * self.entropy_targs[agent_idx]).mean()
+
+                # backward prop + gradient step
+                self.alpha_optimizers[agent_idx].zero_grad()
+                alpha_loss.backward()
+                self.alpha_optimizers[agent_idx].step()   
+
+                # log values
+                loss_Q_list.append(loss_critic.cpu().detach().numpy())
+                loss_pi_list.append(loss_policy.cpu().detach().numpy())
+                logp_list.append(logp_i.cpu().detach().numpy().mean())
+                alpha_list.append(alpha_i.cpu().detach().numpy()[0])
+                alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
+
         # Polyak averaging update
         with torch.no_grad():
             for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
@@ -376,40 +336,58 @@ class Agents:
                 # critic2
                 p2_targ.data *= self.polyak
                 p2_targ.data += ((1 - self.polyak) * p2.data)
-
-        # log last values
-        for agent_idx in range(self.nr_agents):
-            log_prob_list.append(logp[agent_idx].cpu().detach().numpy().mean())
-            alpha_list.append(alphas[agent_idx].cpu().detach().numpy()[0])
             
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
-        return 1, np.array(loss_policy_list), np.array(loss_critic_list), np.array(log_prob_list), np.array(alpha_list), np.array(alpha_loss_list)
+        return 1, np.array(loss_pi_list), np.array(loss_Q_list), np.array(logp_list), np.array(alpha_list), np.array(alpha_loss_list)
 
     def get_action(self, observations, reparameterize = True, deterministic = False):
         # get actor action
         action_list = []
+
         with torch.no_grad():
-            # get global observation
-            global_obs = torch.cat([torch.tensor(obs, dtype = torch.float32).unsqueeze(0).to(self.device) for obs in observations], dim = 1)
+            # make tensor if needed
+            if not torch.is_tensor(observations[0]):
+                # if global observations are given to each agent, we do not need to create it
+                if self.global_observations:
+                    global_obs = torch.tensor(observations[0], dtype = torch.float32).to(self.device)
+                # we need to construct the global observation
+                else:
+                    global_obs = torch.tensor([o for observation in observations for o in observation], dtype = torch.float32).to(self.device)
+            else:
+                if self.global_observations:
+                    global_obs = torch.cat(observations).to(self.device)
+                else:
+                    global_obs = observations[0].to(torch.float32).to(self.device)
+            
+            # create input tensor
+            input_tensor = torch.zeros((self.actor.input_size)).to(self.device)
+            # inplace does not matter because of no_grad()
+            # observations first
+            input_tensor[0 : global_obs.shape[0]] = global_obs
 
-            # sequential actions used as input in succeeding actors
-            seq_acts = torch.empty((1, 0))
+            # index in input tensor where to add additional sequential actions
+            seq_action_index = global_obs.shape[0]
+
             for agent_idx in range(self.nr_agents):
-                
-                # input is observations plus preceding actor actions
-                input = self.createPaddedInput(seq_acts, agent_idx, self.actor_input_size, global_obs)
-                # sample action from policy
-                actions, _ = self.actor.normal_distr_sample(input, reparameterize, deterministic)
-                # add to next input
-                seq_acts = torch.cat([seq_acts, actions], dim = 1)
+                if agent_idx > 0:
+                    # add previous sequential action on the right indices
+                    print("REPLAY ACTION SHAPE", action_list[-1].shape)
+                    print("ADDED TO INPUT SHAPE", input_tensor.shape)
+                    print("AT INDEX", seq_action_index)
+                    input_tensor[seq_action_index : seq_action_index + action_list[-1].shape[0]] = action_list[-1]
+                    # move sequential index
+                    seq_action_index += action_list[-1].shape[0]
 
+                # sample action from policy
+                actions, _ = self.actor.action_distr_sample(input_tensor.unsqueeze(0).to(self.device), reparameterize, deterministic)
+                    
                 # add to list
-                action_list.append(actions.cpu().detach().numpy()[0])
+                action_list.append(actions.squeeze())
 
         return action_list
     
     def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
-              checkpoint = 100000, save_dir = "models"):
+              checkpoint = 250000, save_dir = "models"):
         """Train the SAC agent.
 
         Args:
@@ -421,8 +399,10 @@ class Agents:
             learn_freq (int, optional): The frequency in steps that the agent undergoes one learning iteration. Defaults to 50.
             learn_weight (int, optional): The amount of gradient descent steps per learning iteration. Defaults to 50.
         """
+        current_best = 0
+
         # reset env
-        obs = self.env.reset()
+        obs, _ = self.env.reset()
 
         # episode and epsiode len count
         ep = 0
@@ -438,6 +418,9 @@ class Agents:
         ep_entr_sum = np.zeros(self.nr_agents)
 
         for step in range(nr_steps):
+            # step increment
+            ep_steps += 1
+            
             # sample action (uniform sample for warmup)
             if step < warmup_steps:
                 action = [act_space.sample() for act_space in self.env.action_space]
@@ -446,10 +429,8 @@ class Agents:
                 action = self.get_action(obs)
 
             # transition
-            next_obs, reward, done, info = self.env.step(action)
+            next_obs, reward, done, truncated, info = self.env.step(action)
             
-            # step increment 
-            ep_steps += 1
             # reward addition to total sum
             np.add(ep_rew_sum, reward, out = ep_rew_sum)
 
@@ -457,14 +438,14 @@ class Agents:
             if ep_steps == max_episode_len:
                 done = False
 
-            # add transition to buffer
+            # add transition to replay buffer
             self.replay_buffer.add_transition(obs, action, reward, next_obs, done)
 
             # observation update
             obs = next_obs
 
-            # done or max steps
-            if (done or ep_steps == max_episode_len):
+            # done or max 
+            if (any(done) or all(truncated) or ep_steps == max_episode_len):
                 ep += 1
 
                 # avg losses and entropy
@@ -474,28 +455,38 @@ class Agents:
                     avg_policy_entr = ep_entr_sum / ep_learn_steps
                     avg_alpha = ep_alpha_sum / ep_learn_steps
                     avg_alpha_loss = ep_alphaloss_sum / ep_learn_steps
-                    # save logs 
-                    logs = {"avg_actor_loss": avg_actor_loss,
-                            "avg_critic_loss": avg_critic_loss,
-                            "avg_alpha_loss": avg_alpha_loss,
-                            "avg_alpha": avg_alpha,
-                            "avg_policy_entr": avg_policy_entr}
-                    self.logger.log(logs, step, group = "train")
+                    # save logs (self. because we can use it to save checkpoints)
+                    self.logs = {"avg_actor_loss": avg_actor_loss,
+                                 "avg_critic_loss": avg_critic_loss,
+                                 "avg_alpha_loss": avg_alpha_loss,
+                                 "avg_alpha": avg_alpha,
+                                 "avg_policy_entr": avg_policy_entr}
+                    self.logger.log(self.logs, ep, group = "train")
                 # log reward seperately
-                reward_log = {"reward_sum": ep_rew_sum}
-                self.logger.log(reward_log, step, "Reward")
+                self.rollout_log = {"reward_sum": ep_rew_sum,
+                                    "ep_steps": ep_steps}
+                self.logger.log(self.rollout_log, ep, "rollout")
                 
                 # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
-                if self.citylearn:
-                    self.logger.log_custom_reward_values(step)
+                # if self.citylearn:
+                #     self.logger.log_custom_reward_values(step)
 
                 # add info to progress bar
-                if (ep % 50 == 0):
+                if step % (nr_steps // 20) == 0:
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
-                # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
+                    # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
+                            # checkpoint
+                if np.mean(ep_rew_sum) > current_best:
+                    current_best = np.mean(ep_rew_sum)
+                    self.actor.save(save_dir, "actor")
+                    self.critic1.save(save_dir, "critic1")
+                    self.critic2.save(save_dir, "critic2")
+                    self.critic1_targ.save(save_dir, "critic1_targ")
+                    self.critic2_targ.save(save_dir, "critic2_targ")
+
                 # reset
-                obs = self.env.reset()
+                obs, _ = self.env.reset()
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
@@ -521,14 +512,10 @@ class Agents:
                         np.add(ep_entr_sum, policy_entropy, out = ep_entr_sum)
                         np.add(ep_alpha_sum, alpha, out = ep_alpha_sum)
                         np.add(ep_alphaloss_sum, loss_alpha, out = ep_alphaloss_sum)
-                        
-            # checkpoint
-            if (step % checkpoint == 0):
-                self.actor.save(save_dir, "actor" + "_" + str(step))
-                self.critic1.save(save_dir, "critic1" + "_" + str(step))
-                self.critic2.save(save_dir, "critic2" + "_" + str(step))
-                self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-                self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
 
-
-
+            if step % checkpoint == 0:
+                self.actor.save(save_dir, "actor_" + str(step))
+                self.critic1.save(save_dir, "critic1_" + str(step))
+                self.critic2.save(save_dir, "critic2_" + str(step))
+                self.critic1_targ.save(save_dir, "critic1_targ_" + str(step))
+                self.critic2_targ.save(save_dir, "critic2_targ_" + str(step))

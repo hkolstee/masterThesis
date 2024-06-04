@@ -172,7 +172,7 @@ class Agents:
         policy_act_prev_obs, log_prob_prev_obs = \
             zip(*[actor.normal_distr_sample(obs) for (actor, obs) in zip(self.actors, observations)])
         # create entire set, without grad
-        policy_act_prev_obs_nograd = [act.detach() for act in policy_act_prev_obs]
+        policy_act_prev_obs_set = torch.cat(policy_act_prev_obs, dim = 1)
 
         # FIRST GRADIENT: automatic entropy coefficient tuning (alpha)
         #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target]
@@ -221,21 +221,18 @@ class Agents:
         self.critic1.optimizer.step()
         self.critic2.optimizer.step()
         
-        for agent_idx in range(self.nr_agents):
-            # ACTOR GRADIENT
-            # first freeze critic gradient calculation to save computation
-            for params in self.critic1.parameters():
-                params.requires_grad = False
-            for params in self.critic2.parameters():
-                params.requires_grad = False
+        # ACTOR GRADIENT
+        # first freeze critic gradient calculation to save computation
+        for params in self.critic1.parameters():
+            params.requires_grad = False
+        for params in self.critic2.parameters():
+            params.requires_grad = False
+            
+        # compute Q-values
+        q1_policy = self.critic1.forward(obs_set, policy_act_prev_obs_set)
+        q2_policy = self.critic2.forward(obs_set, policy_act_prev_obs_set)
 
-            # compute Q-values
-            # for this we need set of actions of all agents, where the gradient graph only
-            #   persists of the action of the current actor
-            policy_action_set = torch.cat([act if idx == agent_idx else act_nograd for idx, (act, act_nograd) 
-                            in enumerate(zip(policy_act_prev_obs, policy_act_prev_obs_nograd))], axis = 1)
-            q1_policy = self.critic1.forward(obs_set, policy_action_set)
-            q2_policy = self.critic2.forward(obs_set, policy_action_set)
+        for agent_idx in range(self.nr_agents):
             # take min of these two 
             #   = clipped Q-value for stable learning, reduces overestimation
             q_policy = torch.minimum(q1_policy, q2_policy)
@@ -249,30 +246,32 @@ class Agents:
             # step down gradient
             self.actors[agent_idx].optimizer.step()
 
-            # unfreeze critic gradients
-            for params in self.critic1.parameters():
-                params.requires_grad = True
-            for params in self.critic2.parameters():
-                params.requires_grad = True     
-
-            # Polyak averaging update
-            with torch.no_grad():
-                for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
-                                                    self.critic2.parameters(),
-                                                    self.critic1_targ.parameters(),
-                                                    self.critic2_targ.parameters()):
-                    # critic1
-                    p1_targ.data *= self.polyak
-                    p1_targ.data += ((1 - self.polyak) * p1.data)
-                    # critic2
-                    p2_targ.data *= self.polyak
-                    p2_targ.data += ((1 - self.polyak) * p2.data)
-            
             # log each agent's values
             loss_policy_list.append(loss_policy.cpu().detach().numpy())
             log_prob_list.append(log_prob_prev_obs[agent_idx].cpu().detach().numpy().mean())
             alpha_list.append(alphas[agent_idx].cpu().detach().numpy()[0])
             alpha_loss_list.append(alpha_loss.cpu().detach().numpy())
+
+        # unfreeze critic gradients
+        for params in self.critic1.parameters():
+            params.requires_grad = True
+        for params in self.critic2.parameters():
+            params.requires_grad = True     
+
+        # Polyak averaging update
+        with torch.no_grad():
+            for (p1, p2, p1_targ, p2_targ) in zip(self.critic1.parameters(),
+                                                self.critic2.parameters(),
+                                                self.critic1_targ.parameters(),
+                                                self.critic2_targ.parameters()):
+                # critic1
+                p1_targ.data *= self.polyak
+                p1_targ.data += ((1 - self.polyak) * p1.data)
+                # critic2
+                p2_targ.data *= self.polyak
+                p2_targ.data += ((1 - self.polyak) * p2.data)
+            
+
         # log critic loss
         loss_critic_list.append(loss_critic.cpu().detach().numpy())
             

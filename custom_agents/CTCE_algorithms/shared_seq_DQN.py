@@ -60,12 +60,6 @@ class seqDQN:
         # number of agents
         self.nr_agents = len(env.action_space)
 
-        # one-hot identity per agent
-        self.agent_ids = F.one_hot(torch.tensor(range(self.nr_agents)))
-        # create batched size tensor to add to input
-        self.agent_id_tensors = [self.agent_ids[agent_idx].unsqueeze(0).expand(batch_size, -1) for agent_idx in range(self.nr_agents)]
-        # print(self.agent_id_tensors[0], self.agent_id_tensors[1])
-
         # if not all agents receive global observations from env
         if not self.global_observations:
             obs_size_global = sum([obs.shape[0] for obs in env.observation_space])
@@ -77,7 +71,7 @@ class seqDQN:
         #   the next agent in sequence gets the actions of the previous in sequence additionally as input. Therefore, the total input
         #   size is the obs size, all agent actions except for the last in sequence and the one hot id vector.
         # Agent homogeneuosity is assumed for equal observation/action size.
-        self.DQN_input_size = obs_size_global + (self.nr_agents - 1) * env.action_space[0].n + self.agent_ids.shape[0]
+        self.DQN_input_size = obs_size_global + (self.nr_agents - 1) * env.action_space[0].n
         self.shared_DQN = Critic(lr, self.DQN_input_size, env.action_space[0].n, layer_sizes)
         self.shared_target_DQN = deepcopy(self.shared_DQN)
 
@@ -141,8 +135,6 @@ class seqDQN:
             input_tensor = torch.zeros((self.batch_size, self.shared_target_DQN.input_size))
             # observations first
             input_tensor[:, 0 : obs.shape[1]] = obs
-            # one_hot id (of current agent)
-            input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
         with torch.autograd.set_detect_anomaly(True):
             for agent_idx in range(self.nr_agents):
@@ -168,10 +160,6 @@ class seqDQN:
                         # move index
                         seq_action_index += current_action.shape[1]
 
-                        # we do need to change the onehot id vector to next in sequence
-                        #   one_hot id (of NEXT agent)
-                        targ_input_tensor[:, -self.agent_id_tensors[agent_idx + 1].shape[1] :] = self.agent_id_tensors[agent_idx + 1]
-
                         # max_a_i+1 Q*_i+1(s, a_1, ..., a_i+1)
                         Q_vals = self.shared_target_DQN(targ_input_tensor.to(self.device))
                         max_Q_next_agent = Q_vals.max(1).values
@@ -186,8 +174,6 @@ class seqDQN:
                         # observations first
                         targ_input_tensor[:, 0 : next_obs.shape[1]] = next_obs
                         # no sequential action values to add, we take max action of the first agent
-                        # one_hot id (of first agent !!)
-                        targ_input_tensor[:, -self.agent_id_tensors[0].shape[1] :] = self.agent_id_tensors[0]
 
                         Q_vals = self.shared_target_DQN(targ_input_tensor.to(self.device))
                         max_Q_next_obs = Q_vals.max(1).values
@@ -252,9 +238,6 @@ class seqDQN:
             # epsilon greedy
             else:
                 with torch.no_grad():
-                    # add new one_hot id at the end of the tensor
-                    input_tensor[-self.agent_ids[agent_idx].shape[0] :] = self.agent_ids[agent_idx]
-
                     # forward through DQN, take argmax for max action
                     actions.append(self.shared_DQN(input_tensor.unsqueeze(0).to(self.device)).argmax().item())
 

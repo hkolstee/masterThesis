@@ -77,7 +77,7 @@ class Agents:
         # policies according to method as described in: https://arxiv.org/pdf/1910.00120.pdf
         #   Simply: sequentially calculate policies, while conditioning next policy calculation on action result of last.
         #           Done sequentially per agent, where order is regular agent order. One actor in total for all agents, with parameter sharing.
-        #           Requires homogenous agent action spaces.
+        #           Requires homogenous agent action spaces. No one hot ID required as extra sequential actions create disjoint obs spaces.
         # Two centralized critics (two for stable learning), also sequential for update rules as in https://arxiv.org/pdf/1910.00120.pdf
         actor_input_size = obs_size_global + act_size_global - self.env.action_space[0].shape[0] 
         self.actor = Actor(lr_actor, 
@@ -114,7 +114,6 @@ class Agents:
             # the entropy coef alpha which is to be optimized
             self.log_alphas.append(torch.ones(1, requires_grad = True, device = self.device))   # device this way otherwise leaf tensor
             self.alpha_optimizers.append(torch.optim.Adam([self.log_alphas[-1]], lr = lr_critic))   # shares critic lr
-    
 
     def learn(self):
         """Learn the policy by backpropagation over the critics, and actor network.
@@ -191,8 +190,9 @@ class Agents:
 
                 # --- CRITIC GRADIENT ---
                 # Q values to measure against target
-                # print("INPUT AGENT ", agent_idx)
-                # print(input_tensor)
+                print("INPUT AGENT ", agent_idx)
+                print(input_tensor)
+                print(replay_act[agent_idx].shape, replay_act[agent_idx])
                 q1 = self.critic1.forward(input_tensor, replay_act[agent_idx])
                 q2 = self.critic2.forward(input_tensor, replay_act[agent_idx])
 
@@ -209,6 +209,9 @@ class Agents:
                         targ_input_tensor = input_tensor.clone().detach()
 
                         # add additional actions
+                        print("replay action added with these shapes and indices")
+                        print(replay_act[agent_idx].shape[1], targ_input_tensor.shape)
+                        print(seq_action_index, seq_action_index + replay_act[agent_idx].shape[1])
                         targ_input_tensor[:, seq_action_index : seq_action_index + replay_act[agent_idx].shape[1]] = replay_act[agent_idx]
                         # move index 
                         seq_action_index += replay_act[agent_idx].shape[1]
@@ -217,6 +220,10 @@ class Agents:
                         acts_ip1, logp_ip1 = self.actor.action_distr_sample(targ_input_tensor)
 
                         # get critics output of next stage in sequence
+                        print("TARG INPUT")
+                        print(targ_input_tensor.shape)
+                        print(targ_input_tensor)
+                        print(acts_ip1)
                         q1_targ = self.critic1_targ(targ_input_tensor, acts_ip1)
                         q2_targ = self.critic2_targ(targ_input_tensor, acts_ip1)
 
@@ -245,6 +252,11 @@ class Agents:
                         # get critics output of first stage in sequence
                         q1_targ = self.critic1_targ.forward(targ_input_tensor, act_0_nextobs)
                         q2_targ = self.critic2_targ.forward(targ_input_tensor, act_0_nextobs)
+
+                        print("LAST TARG INPUT")
+                        print(targ_input_tensor.shape)
+                        print(targ_input_tensor)
+                        print(acts_ip1)
 
                         # Clipped double Q trick
                         min_q_targ = torch.minimum(q1_targ, q2_targ)
@@ -298,7 +310,7 @@ class Agents:
                 #   optimal alpha_t = arg min(alpha_t) E[-alpha_t * (log policy(a_t|s_t; alpha_t) - alpha_t * entropy_target)]
                 # we detach because otherwise we backward through the graph of previous calculations using log_prob
                 # Action probabilities can be used to estimate the expectation (cleanRL)
-                alpha_loss = (-self.log_alphas[agent_idx].exp() * (logp_i.detach() + self.entropy_targs[agent_idx])).mean()
+                alpha_loss = (-self.log_alphas[agent_idx].exp() * logp_i.detach() - self.log_alphas[agent_idx].exp() * self.entropy_targs[agent_idx]).mean()
 
                 # backward prop + gradient step
                 self.alpha_optimizers[agent_idx].zero_grad()
@@ -324,7 +336,6 @@ class Agents:
                 # critic2
                 p2_targ.data *= self.polyak
                 p2_targ.data += ((1 - self.polyak) * p2.data)
-
             
         # reutrns policy loss, critic loss, policy entropy, alpha, alpha loss
         return 1, np.array(loss_pi_list), np.array(loss_Q_list), np.array(logp_list), np.array(alpha_list), np.array(alpha_loss_list)
@@ -360,6 +371,8 @@ class Agents:
             for agent_idx in range(self.nr_agents):
                 if agent_idx > 0:
                     # add previous sequential action on the right indices
+                    print("REPLAY ACTION SHAPE", action_list[-1].shape)
+                    print("ADDED TO INPUT SHAPE", input_tensor.shape)
                     input_tensor[seq_action_index : seq_action_index + action_list[-1].shape[0]] = action_list[-1]
                     # move sequential index
                     seq_action_index += action_list[-1].shape[0]

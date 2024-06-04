@@ -58,7 +58,8 @@ class Agents:
                  batch_size = 256,
                  layer_sizes = (256, 256),
                  log_dir = "tensorboard_logs",
-                 global_observations = False):
+                 global_observations = False
+                 ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
