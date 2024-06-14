@@ -2,6 +2,7 @@ import os
 import sys
 
 import torch
+import torch.nn.functional as F
 
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
@@ -51,7 +52,8 @@ class DiscreteActor(MultiLayerPerceptron):
 
         action = prob_distr.sample()
 
-        action_probs = prob_distr.probs
+        # carries network params gradient graph
+        action_probs = F.softmax(action_logits, dim = 1)
 
         # avoid instability
         z = (action_probs == 0.0).float() * 1e-8

@@ -316,7 +316,7 @@ class Agents:
                 # Clipped double Q-trick
                 q_policy = torch.minimum(q1_policy, q2_policy)
                 # entropy regularized loss
-                loss_policy = (probs_i * (alpha_i.unsqueeze(1) * logp_i - q_policy)).mean()
+                loss_policy = (probs_i * (alpha_i.unsqueeze(1) * logp_i - q_policy)).sum(dim = 1).mean()
 
                 # step along gradient
                 self.actor.optimizer.zero_grad()
@@ -434,6 +434,7 @@ class Agents:
         ep_learn_steps = 0
         # sum of log values for each ep
         ep_rew_sum = np.zeros(self.nr_agents)
+        ep_sharedrew_sum = 0
         ep_aloss_sum = np.zeros(self.nr_agents)
         ep_closs_sum = np.zeros(self.nr_agents)
         ep_alpha_sum = np.zeros(self.nr_agents)
@@ -456,6 +457,7 @@ class Agents:
             
             # reward addition to total sum
             np.add(ep_rew_sum, reward, out = ep_rew_sum)
+            ep_sharedrew_sum += np.min(reward)
 
             # set done to false if signal is because of time horizon (spinning up)
             if ep_steps == max_episode_len:
@@ -487,6 +489,7 @@ class Agents:
                     self.logger.log(self.logs, ep, group = "train")
                 # log reward seperately
                 self.rollout_log = {"reward_sum": ep_rew_sum,
+                                    "shared_rew_sum": ep_sharedrew_sum,
                                     "ep_steps": ep_steps}
                 self.logger.log(self.rollout_log, ep, "rollout")
                 
@@ -513,6 +516,7 @@ class Agents:
                 # reset logging info
                 ep_steps = 0
                 ep_learn_steps = 0
+                ep_sharedrew_sum = 0
                 ep_rew_sum = np.zeros(self.nr_agents)
                 ep_aloss_sum = np.zeros(self.nr_agents)
                 ep_closs_sum = np.zeros(self.nr_agents)

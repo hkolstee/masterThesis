@@ -67,15 +67,18 @@ class SoftActorCriticCore(RLbase):
         if self.use_AE:
             self.autoencoder = AutoEncoder(env.observation_space.shape[0], AE_reduc_scale)
         
-        # continuous or discrete actions
-        if self.discrete_actions:
-            act_size = (1,)
-        else:
-            act_size = env.action_space.shape
-        self.replay_buffer = ReplayBuffer(max_size = buffer_max_size, 
-                                          observation_size = env.observation_space.shape,
-                                          action_size = act_size,
-                                          batch_size = batch_size)
+        # quick check for centralized usages of MARL envs, where replaybuffer is init in child class
+        if not (isinstance(env.action_space, list) or isinstance(env.action_space, dict)): 
+            # continuous or discrete actions
+            if self.discrete_actions:
+                act_size = (1,)
+            else:
+                act_size = env.action_space.shape
+            # init replay buffer
+            self.replay_buffer = ReplayBuffer(max_size = buffer_max_size, 
+                                              observation_size = env.observation_space.shape,
+                                              action_size = act_size,
+                                              batch_size = batch_size)
             
         # initialize alpha(s) and optimizers
         self.log_alpha = torch.ones(1, requires_grad = True, device = self.device) 
@@ -135,12 +138,12 @@ class SoftActorCriticCore(RLbase):
     """
     Universal methods
     """
-    def save_networks_parameters(self, save_dir, step):
-        self.actor.save(save_dir, "actor" + "_" + str(step))
-        self.critic1.save(save_dir, "critic1" + "_" + str(step))
-        self.critic2.save(save_dir, "critic2" + "_" + str(step))
-        self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(step))
-        self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(step))
+    def save_networks_parameters(self, save_dir, suffix):
+        self.actor.save(save_dir, "actor" + "_" + str(suffix))
+        self.critic1.save(save_dir, "critic1" + "_" + str(suffix))
+        self.critic2.save(save_dir, "critic2" + "_" + str(suffix))
+        self.critic1_targ.save(save_dir, "critic1_targ" + "_" + str(suffix))
+        self.critic2_targ.save(save_dir, "critic2_targ" + "_" + str(suffix))
 
     def sample_batch(self):
         # sample from buffer
