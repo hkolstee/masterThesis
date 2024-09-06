@@ -162,6 +162,9 @@ class SpiderFlyEnvMA(ParallelEnv):
     def reset(self, seed = None, options = None):
         # set np random seed
         self.rng = np.random.default_rng(seed = seed)
+        
+        # reset time
+        self.timestep = 0
 
         # reset agents
         self.agents = list()
@@ -252,7 +255,7 @@ class SpiderFlyEnvMA(ParallelEnv):
             sides = [tuple(side) for side in [self._action_to_direction[action] + fly_loc for action in [1, 2, 3, 4]]]
             # check in grid array if spiders are on these possible possitions
             count = 0
-            spider_rew = np.repeat(0, self.nr_spiders)
+            spider_rew = np.repeat(-1, self.nr_spiders)
             for side in sides:
                 # collides with wall
                 if any((coord < 0 or coord >= self.size) for coord in side):
@@ -262,7 +265,7 @@ class SpiderFlyEnvMA(ParallelEnv):
                     count += 1
                     for (spider_idx, loc) in enumerate(self._spider_locations):
                         if tuple(loc) == side:
-                            spider_rew[spider_idx] += 2
+                            spider_rew[spider_idx] = 1
             # if all sides are occupied
             if count == 4 or sum(spider_rew) == self.nr_spiders:
                 flies_caught[fly_idx] = True
@@ -271,8 +274,8 @@ class SpiderFlyEnvMA(ParallelEnv):
 
             # add eucledian distance to rewards
             # NOTE: BROKEN FOR > 1 FLY, HAVE TO FIND FAST SOLUTION FOR MORE FLIES
-            for idx in range(len(spider_rew)):
-                spider_rew[idx] -= 4 * self._euclidean_dist(self._spider_locations[idx], self._fly_locations[0])
+            # for idx in range(len(spider_rew)):
+            #     spider_rew[idx] -= 4 * self._euclidean_dist(self._spider_locations[idx], self._fly_locations[0])
         
         return flies_caught, spider_rew
 
@@ -313,13 +316,12 @@ class SpiderFlyEnvMA(ParallelEnv):
         # truncations
         if self.max_steps == self.timestep:
             truncations = {a: True for a in self.possible_agents}
-            self.timestep = 0
         else:
             truncations = {a: False for a in self.possible_agents}
 
         # also needed for pettingzoo api
-        if any(terminals.values()) or all(truncations.values()):
-            self.agents = []
+        # if any(terminals.values()) or all(truncations.values()):
+        #     self.agents = []
 
         # return obs, rew, done, truncated, info
         return observations, rewards, terminals, truncations, infos

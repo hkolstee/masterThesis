@@ -5,10 +5,10 @@ from os import path
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
 # custom imports
-from custom_agents.CTCE_algorithms.centralized_SAC import SAC
+from custom_agents.CTCE_algorithms.centralized_SAC_discrete import SAC
 
 # custom spider fly environment
-from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo2 import SpiderFlyEnvMA
+from spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
 from custom_spider_env.spider_fly_env.wrappers.pettingzoo_wrapper import PettingZooWrapper
 
 def main():
@@ -18,7 +18,7 @@ def main():
     env = PettingZooWrapper(env, normalize = True)
     
     # create model
-    sac_agents = SAC(env, batch_size = 256, layer_sizes = (128, 128), global_obs = True) 
+    sac_agents = SAC(env, batch_size = 256, layer_sizes = (128, 128), global_obs = True, polyak = 0.9925) 
     
     # train agent (ep = 720)
     sac_agents.train(nr_eps = 300000000, warmup_steps = 10000)

@@ -45,14 +45,19 @@ class Agents:
                  batch_size = 256,
                  layer_sizes = (256, 256),
                  log_dir = "tensorboard_logs",
-                 global_observations = False
+                 save_dir = "models",
+                 global_observations = False,
+                 eval_every = 25,
                  ):
         self.env = env
         self.gamma = gamma
         self.polyak = polyak
         self.batch_size = batch_size
         self.global_observations = global_observations
+        self.eval_every = eval_every
+        self.best_eval = -np.inf
         self.nr_agents = len(env.action_space)
+        self.save_dir = save_dir
         
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -183,7 +188,7 @@ class Agents:
             for agent_idx in range(self.nr_agents):
                 if agent_idx > 0:
                     # last target Q input is same as next normal Q input 
-                    input_tensor = targ_input_tensor.clone().detach()
+                    input_tensor = targ_input_tensor.clone().detach().to(self.device)
 
                 # get alpha for remainder of this agent loop
                 alpha_i = torch.exp(self.log_alphas[agent_idx].detach()).to(self.device)
@@ -206,7 +211,7 @@ class Agents:
                         alpha_ip1 = torch.exp(self.log_alphas[agent_idx + 1].detach())
 
                         # first we have to add the actions to the input tensor, and change the onehot id
-                        targ_input_tensor = input_tensor.clone().detach()
+                        targ_input_tensor = input_tensor.clone().detach().to(self.device)
 
                         # add additional actions
                         # print("replay action added with these shapes and indices")
@@ -384,7 +389,47 @@ class Agents:
                 # add to list
                 action_list.append(actions.squeeze())
 
-        return action_list
+        return [act.cpu().detach().numpy() for act in action_list]
+
+
+    def evaluate(self, eps):
+        """
+        Evaluate the current policy.
+        """
+        self.actor.eval()
+        
+        obs, _ = self.env.reset()
+        
+        terminals = [False]
+        truncations = [False]
+        rew_sum = 0
+        ep_steps = 0
+        
+        while not (any(terminals) or all(truncations)):
+            # get action
+            act = self.get_action(obs, deterministic = True)
+            # execute action
+            next_obs, rewards, terminals, truncations, _ = self.env.step(act)
+            
+            # next state
+            obs = next_obs
+
+            # keep track of steps
+            ep_steps += 1
+            
+            # add to reward sum
+            rew_sum += np.mean(rewards)
+        
+        # save if best
+        if rew_sum > self.best_eval:
+            self.best_eval = rew_sum
+            self.actor.save(self.save_dir, "actor_eval")
+            
+        # log rewards
+        self.logger.log({"eval_reward_sum": rew_sum}, eps, "rollout")
+        
+        # turn off eval mode
+        self.actor.train()
     
     def train(self, nr_steps, max_episode_len = -1, warmup_steps = 10000, learn_delay = 1000, learn_freq = 50, learn_weight = 50, 
               checkpoint = 250000, save_dir = "models"):
@@ -467,9 +512,9 @@ class Agents:
                                     "ep_steps": ep_steps}
                 self.logger.log(self.rollout_log, ep, "rollout")
                 
-                # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
-                # if self.citylearn:
-                #     self.logger.log_custom_reward_values(step)
+                # eval
+                if ep % self.eval_every == 0:
+                    self.evaluate(ep)
 
                 # add info to progress bar
                 if step % (nr_steps // 20) == 0:

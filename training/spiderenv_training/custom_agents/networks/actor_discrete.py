@@ -2,6 +2,7 @@ import os
 import sys
 
 import torch
+import torch.nn.functional as F
 
 # add folder to python path for relative imports
 abspath = os.path.abspath(__file__)
@@ -28,8 +29,6 @@ class DiscreteActor(MultiLayerPerceptron):
                          output_size = action_size, 
                          layer_sizes = layer_sizes,
                          optim_eps = eps)
-        # gumbel temperature (tau)
-        self.gumbel_temperature = 1.0
 
         # action list to take dot product with onehot action vector
         self.action_categories = torch.tensor([i for i in range(action_size)], dtype = torch.float32)
@@ -44,14 +43,18 @@ class DiscreteActor(MultiLayerPerceptron):
         # return prob_distr, log_std
         return action_logits
 
-    def action_distr_sample(self, obs):
+    def action_distr_sample(self, obs, deterministic = False):
         action_logits = self.forward(obs)
 
         prob_distr = torch.distributions.OneHotCategorical(logits = action_logits)
 
-        action = prob_distr.sample()
+        if deterministic:
+            action = torch.argmax(action_logits, 1)
+        else:
+            action = prob_distr.sample()
 
-        action_probs = prob_distr.probs
+        # carries network params gradient graph
+        action_probs = F.softmax(action_logits, dim = 1)
 
         # avoid instability
         z = (action_probs == 0.0).float() * 1e-8

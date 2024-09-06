@@ -20,7 +20,8 @@ from ..utils.logger import Logger
 from copy import deepcopy
 
 class seqDQN:
-    def __init__(self, env, 
+    def __init__(self, 
+                 env, 
                  lr = 1e-3, 
                  gamma = 0.99, 
                  eps_start = 0.9, 
@@ -33,6 +34,7 @@ class seqDQN:
                  global_observations = False,
                  log_dir = "tensorboard_logs",
                  save_dir = "models",
+                 eval_every = 25,
                  ):
         self.env = env
         self.lr = lr
@@ -45,12 +47,15 @@ class seqDQN:
         self.buffer_max_size = buffer_max_size
         self.global_observations = global_observations
         self.save_dir = save_dir
+        self.eval_every = eval_every
 
         # initialize device
         self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
         # logging utility
         self.logger = Logger(env, log_dir)
+        # logging best eval model
+        self.best_eval = -np.inf
 
         # starting epsilon
         self.eps = eps_start
@@ -197,8 +202,47 @@ class seqDQN:
 
         # return status 1
         return 1, loss_list, Q_list, Q_target_list
+    
+    def evaluate(self, eps):
+        """
+        Evaluate the current policy.
+        """
+        self.shared_DQN.eval()
+        
+        obs, _ = self.env.reset()
+        
+        terminals = [False]
+        truncations = [False]
+        rew_sum = 0
+        ep_steps = 0
+        
+        while not (any(terminals) or all(truncations)):
+            # get action
+            act = self.get_action(obs, deterministic = True)
+            # execute action
+            next_obs, rewards, terminals, truncations, _ = self.env.step(act)
+            
+            obs = next_obs
 
-    def get_actions(self, observations, deterministic = False):
+            # keep track of steps
+            ep_steps += 1
+            
+            # add to reward sum
+            rew_sum += np.mean(rewards)
+        
+        # save if best
+        if rew_sum > self.best_eval:
+            self.best_eval = rew_sum
+            self.shared_DQN.save(self.save_dir, "DQN_eval")
+            self.shared_target_DQN.save(self.save_dir, "target_DQN_eval")
+            
+        # log rewards
+        self.logger.log({"eval_reward_sum": rew_sum}, eps, "rollout")
+        
+        # turn off eval mode
+        self.shared_DQN.train()
+
+    def get_action(self, observations, deterministic = False):
         # action list
         actions = []
 
@@ -268,7 +312,7 @@ class seqDQN:
             ep_steps = 0
             while not (any(terminals) or all(truncations)):
                 # get actions
-                actions = self.get_actions(obs)
+                actions = self.get_action(obs)
                 # take action
                 next_obs, rewards, terminals, truncations, _ = self.env.step(actions)
 
@@ -300,6 +344,10 @@ class seqDQN:
                 if self.global_steps < self.eps_steps:
                     self.global_steps += 1
                 ep_steps += 1
+            
+            # eval
+            if eps % self.eval_every == 0:
+                self.evaluate(eps)
 
             # save if best
             current_rew = np.mean(rew_sum)

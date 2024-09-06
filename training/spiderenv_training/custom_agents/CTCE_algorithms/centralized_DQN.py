@@ -32,6 +32,7 @@ class DQN:
                  global_observations = False,
                  log_dir = "tensorboard_logs",
                  save_dir = "models",
+                 eval_every = 25,
                  ):
         self.env = env
         self.lr = lr
@@ -44,6 +45,10 @@ class DQN:
         self.buffer_max_size = buffer_max_size
         self.global_obs = global_observations
         self.save_dir = save_dir
+        self.eval_every = eval_every
+
+        # evaluation performance meter for saving best model
+        self.best_eval = -np.inf
 
         # init logger
         self.logger = Logger(env, log_dir)
@@ -139,9 +144,57 @@ class DQN:
                 # return combi of actions
                 act = list(self.index_to_act_combi[idx]) 
                 return act, idx
+            
+    def evaluate(self, eps):
+        """
+        Evaluate the current policy.
+        """
+        self.DQN.eval()
+        
+        obs, _ = self.env.reset()
+        if self.global_obs:
+            obs = obs[0]
+        else:
+            obs = [item for o in obs for item in o]
+        
+        terminals = [False]
+        truncations = [False]
+        rew_sum = 0
+        ep_steps = 0
+        
+        while not (any(terminals) or all(truncations)):
+            # get action
+            act, idx = self.get_action(obs, deterministic = True)
+            # execute action
+            next_obs, rewards, terminals, truncations, _ = self.env.step(act)
+            
+            # next state
+            if self.global_obs:
+                obs = next_obs[0]
+            else:
+                # concat list of lists
+                obs = [item for o in next_obs for item in o]
 
+            # keep track of steps
+            ep_steps += 1
+            
+            # add to reward sum
+            rew_sum += np.mean(rewards)
+        
+        # save if best
+        if rew_sum > self.best_eval:
+            self.best_eval = rew_sum
+            self.DQN.save(self.save_dir, "DQN_eval")
+            self.target_DQN.save(self.save_dir, "target_DQN_eval")
+            
+        # log rewards
+        self.logger.log({"eval_reward_sum": rew_sum}, eps, "rollout")
+        
+        # turn off eval mode
+        self.DQN.train()
+                
     def train(self, num_episodes):
-        current_best = 0
+        best_train = 0
 
         for eps in range(num_episodes):
             obs, _ = self.env.reset()
@@ -200,10 +253,14 @@ class DQN:
                 if self.global_steps < self.eps_steps:
                     self.global_steps += 1
                 ep_steps += 1
+                
+            # eval
+            if eps % self.eval_every == 0:
+                self.evaluate(eps)
 
             # save if best
-            if rew_sum > current_best:
-                current_best = rew_sum
+            if rew_sum > best_train:
+                best_train = rew_sum
                 self.DQN.save_checkpoint(self.save_dir, "DQN", loss, eps)
                 self.target_DQN.save_checkpoint(self.save_dir, "target_DQN", loss, eps)
 
@@ -224,3 +281,4 @@ class DQN:
 
             if eps % (num_episodes // 20) == 0:
                 print("Episode: " + str(eps) + " - Reward:" + str(rew_sum) + " - Avg loss (last ep):", avg_loss)
+                
