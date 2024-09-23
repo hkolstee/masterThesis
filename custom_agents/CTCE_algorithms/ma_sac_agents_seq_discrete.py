@@ -86,6 +86,13 @@ class Agents:
         #                     or isinstance(self.env, CityLearnEnv) \
         #                     or isinstance(self.env, NormalizedSpaceWrapper)) \
         #                     else False
+        
+        if isinstance(self.env.action_space[0], spaces.Box):
+            # pad by min - 1
+            self.padding_val = min([act_space.low.item for act_space in self.env.action_space]) - 1
+        else:
+            # padding values we take as - 1, 0 is lowest action possible with discrete action space
+            self.padding_val = - 1.0
 
         # initialize replay buffer
         obs_size_list = [obs.shape for obs in self.env.observation_space]
@@ -208,7 +215,7 @@ class Agents:
         # preconstruct input tensors to which the sequential actions will be added
         with torch.no_grad():
             # prepare input
-            input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+            input_tensor = torch.full((self.batch_size, self.actor.input_size), self.padding_val, dtype = torch.float32).to(self.device)
             # observations first
             input_tensor[:, 0 : obs.shape[1]] = obs
 
@@ -271,7 +278,7 @@ class Agents:
                         alpha_0 = torch.exp(self.log_alphas[0].detach())
 
                         # create new target tensors
-                        targ_input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+                        targ_input_tensor = torch.full((self.batch_size, self.actor.input_size), self.padding_val, dtype = torch.float32).to(self.device)
 
                         # add next observation
                         targ_input_tensor[:, 0 : next_obs.shape[1]] = next_obs
@@ -390,7 +397,7 @@ class Agents:
                     global_obs = observations[0].to(torch.float32).to(self.device)
             
             # create input tensor
-            input_tensor = torch.zeros((self.actor.input_size))
+            input_tensor = torch.full((self.actor.input_size,), self.padding_val, dtype = torch.float32)
             # inplace does not matter because of no_grad()
             # observations first
             input_tensor[0 : global_obs.shape[0]] = global_obs
@@ -430,7 +437,8 @@ class Agents:
         
         while not (any(terminals) or all(truncations)):
             # get action
-            act = self.get_action(obs, deterministic = True)
+            with torch.no_grad():
+                act = self.get_action(obs)
             # execute action
             next_obs, rewards, terminals, truncations, _ = self.env.step(act)
             
@@ -501,11 +509,11 @@ class Agents:
             
             # reward addition to total sum
             np.add(ep_rew_sum, reward, out = ep_rew_sum)
-            ep_sharedrew_sum += np.min(reward)
+            ep_sharedrew_sum += np.mean(reward)
 
             # set done to false if signal is because of time horizon (spinning up)
-            if ep_steps == max_episode_len:
-                done = False
+            # if ep_steps == max_episode_len:
+            #     done = False
 
             # add transition to replay buffer
             self.replay_buffer.add_transition(obs, action, reward, next_obs, done)
@@ -514,7 +522,7 @@ class Agents:
             obs = next_obs
 
             # done or max 
-            if (any(done) or all(truncated) or ep_steps == max_episode_len):
+            if (any(done) or any(truncated) or ep_steps == max_episode_len):
                 ep += 1
 
                 # avg losses and entropy
@@ -540,13 +548,14 @@ class Agents:
                 # eval
                 if ep % self.eval_every == 0:
                     self.evaluate(ep)
+                    # pass
 
                 # add info to progress bar
                 if step % (nr_steps // 20) == 0:
                     print("[Episode {:d} total reward: ".format(ep) + str(ep_rew_sum) + "] ~ ")
                     # pbar.set_description("[Episode {:d} mean reward: {:0.3f}] ~ ".format(ep, ', '.join(avg_rew)))
                 
-                            # checkpoint
+                # checkpoint
                 if np.mean(ep_rew_sum) > current_best:
                     current_best = np.mean(ep_rew_sum)
                     self.actor.save(save_dir, "actor_best")

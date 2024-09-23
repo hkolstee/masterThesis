@@ -95,7 +95,7 @@ class DQN:
         # buffer not full enough
         if self.replay_buffer.buffer_index < self.batch_size:
             # return status 0
-            return 0, None, None, None
+            return 0, None
         
         # sample from buffer 
         obs, replay_act, rewards, next_obs, done = self.replay_buffer.sample()
@@ -116,14 +116,15 @@ class DQN:
         Q_target = rewards + (1 - done) * self.gamma * maxQ_next_obs
         
         # loss
-        loss = F.huber_loss(Q_taken_action, Q_target.unsqueeze(1))
+        loss = F.huber_loss(Q_taken_action.squeeze(), Q_target)
+
         # backward prop + gradient step
         self.DQN.optimizer.zero_grad()
         loss.backward()
         self.DQN.optimizer.step()
 
         # return status 1
-        return 1, loss.detach().item(), torch.mean(Q_taken_action).detach().item(), torch.mean(Q_target.detach()).item()
+        return 1, loss.detach().item()
     
     def get_action(self, observation, deterministic = False):
         if not torch.is_tensor(observation):
@@ -145,6 +146,20 @@ class DQN:
                 act = list(self.index_to_act_combi[idx]) 
                 return act, idx
             
+    def get_Q(self, observations):
+        with torch.no_grad():
+            # prepare input
+            input_tensor = torch.tensor(np.array(observations), dtype = torch.float32).to(self.device)
+            
+            self.DQN.eval()
+            
+            with torch.no_grad():
+                Q_val = self.DQN(input_tensor.to(self.device)).max().item()
+            
+            self.DQN.train()
+            
+        return Q_val
+            
     def evaluate(self, eps):
         """
         Evaluate the current policy.
@@ -164,7 +179,8 @@ class DQN:
         
         while not (any(terminals) or all(truncations)):
             # get action
-            act, idx = self.get_action(obs, deterministic = True)
+            with torch.no_grad():
+                act, idx = self.get_action(obs, deterministic = True)
             # execute action
             next_obs, rewards, terminals, truncations, _ = self.env.step(act)
             
@@ -180,6 +196,8 @@ class DQN:
             
             # add to reward sum
             rew_sum += np.mean(rewards)
+            
+        _,_ = self.env.reset()
         
         # save if best
         if rew_sum > self.best_eval:
@@ -207,12 +225,14 @@ class DQN:
             terminals = [False]
             truncations = [False]
             rew_sum = 0
-            Q_sum = 0
-            Q_target_sum = 0
             loss_sum = 0
 
             learn_steps = 0
             ep_steps = 0
+            
+            # initial Q value for logging
+            initial_Q = self.get_Q(obs)
+            
             while not (any(terminals) or all(truncations)):
                 # get actions
                 act, idx = self.get_action(obs)
@@ -231,15 +251,13 @@ class DQN:
                 self.replay_buffer.add_transition(obs, act, np.mean(rewards), next_obs, terminals[0])
 
                 # learning step
-                status, loss, Q_val, Q_target = self.learn()
+                status, loss = self.learn()
 
                 if status:
                     # add to learn steps
                     learn_steps += 1
                     # add to loss sum
                     loss_sum += loss
-                    Q_sum += Q_val
-                    Q_target_sum += Q_target
                     # soft update / polyak update
                     self.polyak_update(self.DQN, self.target_DQN, 1 - self.tau)
                     
@@ -267,11 +285,8 @@ class DQN:
             # log
             if learn_steps:
                 avg_loss = loss_sum / learn_steps
-                avg_Q = Q_sum / learn_steps
-                avg_target_Q = Q_target_sum / learn_steps
                 self.logger.log({"avg_Q_loss":  avg_loss, 
-                                 "avg_Q_value": avg_Q,
-                                 "avg_Q_target_value": avg_target_Q,
+                                 "start_state_Q": initial_Q,
                                  "epsilon": self.current_eps}, eps, "train")
             else:
                 avg_loss = None

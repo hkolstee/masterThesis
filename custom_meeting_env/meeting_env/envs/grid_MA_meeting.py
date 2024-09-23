@@ -275,8 +275,8 @@ class grid_meeting_env(ParallelEnv):
         score = self.check_score()
 
         # get reward, each step 
-        if score == self.nr_agents:
-            rewards = {a: 1 for a in self.possible_agents}
+        if np.isclose(score, self.nr_agents):
+            rewards = {a: 1.0 for a in self.possible_agents}
             terminals = {a: True for a in self.possible_agents}
         else:
             terminals = {a: False for a in self.possible_agents}

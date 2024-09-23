@@ -320,8 +320,8 @@ class SpiderFlyEnvMA(ParallelEnv):
             truncations = {a: False for a in self.possible_agents}
 
         # also needed for pettingzoo api
-        # if any(terminals.values()) or all(truncations.values()):
-        #     self.agents = []
+        if any(terminals.values()) or all(truncations.values()):
+            self.agents = []
 
         # return obs, rew, done, truncated, info
         return observations, rewards, terminals, truncations, infos
