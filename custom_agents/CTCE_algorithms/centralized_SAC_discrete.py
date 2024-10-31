@@ -38,6 +38,7 @@ class SAC:
                  layer_sizes = (256, 256), 
                  use_AE = False,
                  AE_reduc_scale = 6,
+                 alpha_temp_multiplier = 1.,
                  log_dir = "tensorboard_logs", 
                  save_dir = "models",
                  global_obs = False,
@@ -109,7 +110,7 @@ class SAC:
             
         # entropy target
         # self._entropy_targ = -0.98 * torch.log(1 / torch.tensor(self.env.action_space.n))
-        self.entropy_targ = -len(self.index_to_act_combi)
+        self.entropy_targ = alpha_temp_multiplier * -len(self.index_to_act_combi)
         
     def polyak_update(self, base_network, target_network, polyak):
         """ 
@@ -240,8 +241,12 @@ class SAC:
             q_targ =  (probs * (min_q_targ - self.alpha.unsqueeze(1) * log_probs)).sum(dim = 1)
                 
             # Bellman approximation
+            
             bellman = rewards + self.gamma * (1 - dones) * q_targ
-
+            # if dones[0] > 0:
+            #     print("train", dones)
+            #     print(bellman)
+            
         # loss is MSEloss over Bellman error (MSBE = mean squared bellman error)
         loss_critic1 = F.mse_loss(q1_buffer, bellman)
         loss_critic2 = F.mse_loss(q2_buffer, bellman)
@@ -381,6 +386,7 @@ class SAC:
                 next_obs, reward, done, truncated, info = self.env.step(actions)
                 done = done[0]
                 truncated = truncated[0]
+                
                 if self.global_obs:
                     next_obs = next_obs[0]
                 else:
@@ -396,8 +402,8 @@ class SAC:
                 ep_rew_sum += reward
 
                 # set done to false if signal is because of time horizon (spinning up)
-                if ep_steps == max_episode_len:
-                    done = False
+                # if ep_steps == max_episode_len:
+                #     done = False
 
                 # add transition to buffer
                 self.replay_buffer.add_transition(obs, index, reward, next_obs, done)
@@ -407,6 +413,7 @@ class SAC:
                 
                 # learn
                 if step > learn_delay and step % learn_freq == 0:
+                    # print(step)
                     for _ in range(learn_weight):
                         # learning 
                         status, loss_actor, loss_critic, alpha, loss_alpha = self.learn()
@@ -421,6 +428,7 @@ class SAC:
                             
             # avg losses and entropy
             if (ep_learn_steps > 0):
+                # print(step)
                 avg_actor_loss = ep_aloss_sum / ep_learn_steps
                 avg_critic_loss = ep_closs_sum / ep_learn_steps
                 avg_alpha = ep_alpha_sum / ep_learn_steps
@@ -436,7 +444,7 @@ class SAC:
             # log reward seperately
             reward_log = {"reward_sum": ep_rew_sum,
                           "ep_len": ep_steps}
-            self.logger.log(reward_log, ep, "reward")
+            self.logger.log(reward_log, ep, "rollout")
 
             # eval
             if ep % self.eval_every == 0:

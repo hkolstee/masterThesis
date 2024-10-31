@@ -35,7 +35,9 @@ class SAC(SoftActorCriticCore):
                  use_AE = False,
                  AE_reduc_scale = 6,
                  log_dir="tensorboard_logs", 
+                 save_dir = "models",
                  global_observations = False,
+                 eval_every = 25
                  ):
         """
         Super class initializes all but the actor and critic networks and 
@@ -51,6 +53,9 @@ class SAC(SoftActorCriticCore):
                          AE_reduc_scale = AE_reduc_scale,
                          log_dir = log_dir)
         self.global_obs = global_observations
+        self.eval_every = eval_every
+        self.best_eval = -np.inf
+        self.save_dir = save_dir
         
         # nr of agents in env
         self.nr_agents = len(env.action_space)
@@ -205,6 +210,57 @@ class SAC(SoftActorCriticCore):
     """
     Override normal methods
     """
+    def evaluate(self, eps):
+        """
+        Evaluate the current policy.
+        """
+        self.actor.eval()
+        
+        obs, _ = self.env.reset()
+        if self.global_obs:
+            obs = obs[0]
+        else:
+            obs = [item for o in obs for item in o]
+        
+        terminals = [False]
+        truncations = [False]
+        rew_sum = 0
+        ep_steps = 0
+        
+        while not (any(terminals) or all(truncations)):
+            # get action
+            act = self.get_action(obs, deterministic = True)
+            # execute action
+            next_obs, rewards, terminals, truncations, _ = self.env.step(act)
+            
+            # next state
+            if self.global_obs:
+                obs = next_obs[0]
+            else:
+                # concat list of lists
+                obs = [item for o in next_obs for item in o]
+
+            # keep track of steps
+            ep_steps += 1
+            
+            # add to reward sum
+            rew_sum += np.mean(rewards)
+        
+        # save if best
+        if rew_sum > self.best_eval:
+            self.best_eval = rew_sum
+            self.actor.save(self.save_dir, "actor_eval")
+            self.critic1.save(self.save_dir, "crit1_eval")
+            self.critic1_targ.save(self.save_dir, "crit1_target_eval")
+            self.critic2.save(self.save_dir, "crit2_eval")
+            self.critic2_targ.save(self.save_dir, "crit2_target_eval")
+            
+        # log rewards
+        self.logger.log({"eval_reward_sum": rew_sum}, eps, "rollout")
+        
+        # turn off eval mode
+        self.actor.train()
+    
     def train(self, 
               nr_eps, 
               max_episode_len = -1, 
@@ -308,9 +364,9 @@ class SAC(SoftActorCriticCore):
             reward_log = {"reward_sum": ep_rew_sum}
             self.logger.log(reward_log, ep, "reward")
 
-            # NOTE: for now like this for citylearn additional logging, should be in wrapper or something
-            # if self.citylearn:
-            #     self.logger.log_custom_reward_values(step)
+            # eval
+            if ep % self.eval_every == 0:
+                self.evaluate(ep)
 
             # add info to progress bar
             if ep % (nr_eps // 20) == 0:

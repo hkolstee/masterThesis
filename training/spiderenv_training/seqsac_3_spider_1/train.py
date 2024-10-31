@@ -8,7 +8,7 @@ sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 from custom_agents.CTCE_algorithms.ma_sac_agents_seq_discrete import Agents
 
 # custom spider fly environment
-from spider_fly_env.envs.grid_MA_pettingzoo import SpiderFlyEnvMA
+from custom_spider_env.spider_fly_env.envs.grid_MA_pettingzoo2 import SpiderFlyEnvMA
 from custom_spider_env.spider_fly_env.wrappers.pettingzoo_wrapper import PettingZooWrapper
 
 def main():

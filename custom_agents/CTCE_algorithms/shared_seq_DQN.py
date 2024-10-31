@@ -249,15 +249,31 @@ class seqDQN:
 
     def get_Q(self, observations):
         with torch.no_grad():
-            # prepare input
-            input_tensor = torch.full((self.batch_size, self.shared_target_DQN.input_size), self.padding_val, dtype = torch.float32)
+            # make tensor if needed
+            if not torch.is_tensor(observations[0]):
+                # if global observations are given to each agent, we do not need to create it
+                if self.global_observations:
+                    global_obs = torch.tensor(observations[0], dtype = torch.float32)
+                # we need to construct the global observation
+                else:
+                    global_obs = torch.tensor([o for observation in observations for o in observation], dtype = torch.float32)
+            else:
+                if self.global_observations:
+                    global_obs = observations[0].to(torch.float32)
+                else:
+                    global_obs = torch.cat(observations)
+
+            # create input tensor in case of epsilon greedy
+            # which is [observations, seqential_acts]
+            input_tensor = torch.full((self.DQN_input_size,), self.padding_val, dtype = torch.float32)
+            # inplace does not matter because of no_grad
             # observations first
-            input_tensor[:, 0 : observations.shape[1]] = observations
+            input_tensor[0 : global_obs.shape[0]] = global_obs
             
             self.shared_DQN.eval()
             
             with torch.no_grad():
-                Q_val = self.shared_DQN(input_tensor.to(self.device))
+                Q_val = self.shared_DQN(input_tensor.to(self.device)).max().item()
             
             self.shared_DQN.train()
             

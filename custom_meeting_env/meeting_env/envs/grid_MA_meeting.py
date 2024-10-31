@@ -276,11 +276,13 @@ class grid_meeting_env(ParallelEnv):
 
         # get reward, each step 
         if np.isclose(score, self.nr_agents):
-            rewards = {a: 1.0 for a in self.possible_agents}
+            # rewards = {a: 1.0 for a in self.possible_agents}
+            rewards = {a: 1000 for a in self.possible_agents}
             terminals = {a: True for a in self.possible_agents}
         else:
             terminals = {a: False for a in self.possible_agents}
-            rewards = {a: -0.001 for a in self.possible_agents}
+            # rewards = {a: -0.001 for a in self.possible_agents}
+            rewards = {a: -1 for a in self.possible_agents}
 
         # truncations
         if self.max_steps == self.timestep:

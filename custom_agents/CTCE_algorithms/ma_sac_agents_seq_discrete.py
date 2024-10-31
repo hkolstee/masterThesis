@@ -54,7 +54,7 @@ class Agents:
                  lr_critic = 0.0003, 
                  gamma = 0.99, 
                  polyak = 0.995,
-                 alpha_temp_multiplier = 1,
+                 alpha_temp_multiplier = 1.,
                  buffer_max_size = 1000000,
                  batch_size = 256,
                  layer_sizes = (256, 256),
@@ -542,7 +542,7 @@ class Agents:
                 # log reward seperately
                 self.rollout_log = {"reward_sum": ep_rew_sum,
                                     "shared_rew_sum": ep_sharedrew_sum,
-                                    "ep_steps": ep_steps}
+                                    "ep_len": ep_steps}
                 self.logger.log(self.rollout_log, ep, "rollout")
 
                 # eval

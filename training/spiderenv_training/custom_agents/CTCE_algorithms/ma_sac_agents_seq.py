@@ -65,6 +65,9 @@ class Agents:
         # initialize logger
         self.logger = Logger(self.env, log_dir)
         
+        # padding val is lowest value possible - 1
+        self.padding_val = min([act_space.low.item for act_space in self.env.action_space]) - 1
+        
         # initialize replay buffer
         obs_sizes = [obs.shape for obs in self.env.observation_space]
         act_sizes = [act.shape for act in self.env.action_space]
@@ -179,7 +182,7 @@ class Agents:
         # preconstruct input tensors to which the sequential actions will be added
         with torch.no_grad():
             # prepare input
-            input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+            input_tensor = torch.full((self.batch_size, self.actor.input_size), self.padding_val, dtype = torch.float32).to(self.device)
             # observations first
             input_tensor[:, 0 : obs.shape[1]] = obs
         
@@ -246,7 +249,7 @@ class Agents:
                         alpha_0 = torch.exp(self.log_alphas[0].detach())
 
                         # create new target tensors
-                        targ_input_tensor = torch.zeros((self.batch_size, self.actor.input_size)).to(self.device)
+                        targ_input_tensor = torch.full((self.batch_size, self.actor.input_size), self.padding_val, dtype = torch.float32).to(self.device)
 
                         # add next observation
                         targ_input_tensor[:, 0 : next_obs.shape[1]] = next_obs
@@ -365,7 +368,7 @@ class Agents:
                     global_obs = observations[0].to(torch.float32).to(self.device)
             
             # create input tensor
-            input_tensor = torch.zeros((self.actor.input_size)).to(self.device)
+            input_tensor = torch.full((self.actor.input_size,), self.padding_val, dtype = torch.float32).to(self.device)
             # inplace does not matter because of no_grad()
             # observations first
             input_tensor[0 : global_obs.shape[0]] = global_obs
@@ -407,7 +410,8 @@ class Agents:
         
         while not (any(terminals) or all(truncations)):
             # get action
-            act = self.get_action(obs, deterministic = True)
+            with torch.no_grad():
+                act = self.get_action(obs)
             # execute action
             next_obs, rewards, terminals, truncations, _ = self.env.step(act)
             
